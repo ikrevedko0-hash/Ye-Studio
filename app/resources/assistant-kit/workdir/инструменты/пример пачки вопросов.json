@@ -1,0 +1,1115 @@
+{
+ "v": 1,
+ "pack": "Мой пак",
+ "batch": "2026-09-25-questions-2",
+ "stage": "questions",
+ "themes": [
+  {
+   "id": "t05",
+   "round": 1,
+   "name": "Бренд по силуэту",
+   "comment": "Назовите бренд",
+   "note": "Взято 6 — нужен ещё один на 700. Цены переставил по узнаваемости формы.",
+   "questions": [
+    {
+     "id": "t05q1",
+     "pre": true,
+     "price": 100,
+     "text": "Назовите бренд",
+     "image": "бутылка Coca-Cola силуэт",
+     "answer": "Coca-Cola",
+     "answerImage": "бутылка Coca-Cola",
+     "accept": [
+      "Кока-кола"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q2",
+     "pre": true,
+     "price": 200,
+     "text": "Назовите бренд",
+     "image": "Pringles тубус силуэт",
+     "answer": "Pringles",
+     "answerImage": "Pringles упаковка",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q3",
+     "pre": true,
+     "price": 300,
+     "text": "Назовите бренд",
+     "image": "Toblerone упаковка силуэт",
+     "answer": "Toblerone",
+     "answerImage": "Toblerone шоколад",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q4",
+     "pre": true,
+     "price": 400,
+     "text": "Назовите бренд",
+     "image": "бутылка Absolut водка силуэт",
+     "answer": "Absolut",
+     "answerImage": "бутылка Absolut водка",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q5",
+     "pre": true,
+     "price": 500,
+     "text": "Назовите бренд",
+     "image": "бутылка Jack Daniel's силуэт",
+     "answer": "Jack Daniel's",
+     "answerImage": "бутылка Jack Daniel's",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q6",
+     "pre": true,
+     "price": 600,
+     "text": "Назовите бренд",
+     "image": "бутылочка Actimel силуэт",
+     "answer": "Actimel",
+     "answerImage": "Actimel бутылочка",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q7",
+     "pre": null,
+     "price": 700,
+     "text": "Назовите бренд",
+     "image": "зажигалка Zippo силуэт",
+     "answer": "Zippo",
+     "answerImage": "зажигалка Zippo",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q8",
+     "pre": null,
+     "price": 700,
+     "text": "Назовите бренд",
+     "image": "банка Nutella силуэт",
+     "answer": "Nutella",
+     "answerImage": "банка Nutella",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t05q9",
+     "pre": null,
+     "price": 700,
+     "text": "Назовите бренд",
+     "image": "синяя жестяная банка Nivea крем силуэт",
+     "answer": "Nivea",
+     "answerImage": "крем Nivea синяя банка",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t04",
+   "round": 1,
+   "name": "Антидепрессант или эльф Толкина?",
+   "comment": "Одна цена, 7 вопросов",
+   "note": "Вместо покемонов. Препараты: агомелатин, тразодон, тианептин, флувоксамин, венлафаксин, дулоксетин — все антидепрессанты. Эльфы — из «Сильмариллиона» и «Властелина колец». Выбрать 7, лучше вперемешку 4 на 3.",
+   "questions": [
+    {
+     "id": "t04q1",
+     "pre": null,
+     "price": 300,
+     "text": "Вальдоксан",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Вальдоксан упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q2",
+     "pre": null,
+     "price": 300,
+     "text": "Карантир",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Карантир сын Феанора арт",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q3",
+     "pre": null,
+     "price": 300,
+     "text": "Триттико",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Триттико упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q4",
+     "pre": null,
+     "price": 300,
+     "text": "Ородрет",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Ородрет Сильмариллион арт",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q5",
+     "pre": null,
+     "price": 300,
+     "text": "Коаксил",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Коаксил упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q6",
+     "pre": null,
+     "price": 300,
+     "text": "Маэглин",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Маэглин Сильмариллион арт",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q7",
+     "pre": null,
+     "price": 300,
+     "text": "Феварин",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Феварин упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q8",
+     "pre": null,
+     "price": 300,
+     "text": "Келебримбор",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Келебримбор Кольца власти",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q9",
+     "pre": null,
+     "price": 300,
+     "text": "Велаксин",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Велаксин упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q10",
+     "pre": null,
+     "price": 300,
+     "text": "Эрестор",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Эрестор Ривенделл арт",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q11",
+     "pre": null,
+     "price": 300,
+     "text": "Симбалта",
+     "image": null,
+     "answer": "Антидепрессант",
+     "answerImage": "Симбалта упаковка",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    },
+    {
+     "id": "t04q12",
+     "pre": null,
+     "price": 300,
+     "text": "Аэгнор",
+     "image": null,
+     "answer": "Эльф Толкина",
+     "answerImage": "Аэгнор Сильмариллион арт",
+     "accept": [],
+     "options": [
+      "Антидепрессант",
+      "Эльф Толкина"
+     ],
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t06",
+   "round": 1,
+   "name": "Чья дверь?",
+   "comment": "Кто за ней живёт?",
+   "note": "Готово: 7 из 7.",
+   "questions": [
+    {
+     "id": "t06q1",
+     "pre": true,
+     "price": 100,
+     "text": "Чья это дверь?",
+     "image": "дверь чулана под лестницей Тисовая улица 4 Гарри Поттер",
+     "answer": "Гарри Поттера (чулан под лестницей)",
+     "answerImage": "Гарри Поттер чулан под лестницей кадр",
+     "accept": [
+      "Гарри Поттер"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q2",
+     "pre": true,
+     "price": 200,
+     "text": "Чья это дверь?",
+     "image": "дверь дома Шрека на болоте",
+     "answer": "Шрека",
+     "answerImage": "Шрек у дома на болоте",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q3",
+     "pre": true,
+     "price": 300,
+     "text": "Чья это дверь?",
+     "image": "дверь ананаса Губки Боба",
+     "answer": "Губки Боба",
+     "answerImage": "Губка Боб ананас дом",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q4",
+     "pre": true,
+     "price": 400,
+     "text": "Чья это дверь?",
+     "image": "дверь ТАРДИС крупно",
+     "answer": "Доктора (ТАРДИС, «Доктор Кто»)",
+     "answerImage": "ТАРДИС Доктор Кто",
+     "accept": [
+      "Доктор Кто"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q5",
+     "pre": true,
+     "price": 500,
+     "text": "Чья это дверь?",
+     "image": "дверь комнаты Бу Корпорация монстров",
+     "answer": "Бу («Корпорация монстров»)",
+     "answerImage": "Бу Корпорация монстров дверь",
+     "accept": [
+      "Корпорация монстров"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q6",
+     "pre": true,
+     "price": 600,
+     "text": "Чья это дверь?",
+     "image": "Даунинг-стрит 10 дверь",
+     "answer": "Премьер-министра Великобритании (Даунинг-стрит, 10)",
+     "answerImage": "Даунинг-стрит 10 премьер-министр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t06q7",
+     "pre": true,
+     "price": 700,
+     "text": "Чья это дверь?",
+     "image": "дверь номера 237 отель Оверлук",
+     "answer": "Номер 237, «Сияние»",
+     "answerImage": "Сияние номер 237 кадр",
+     "accept": [
+      "Сияние"
+     ],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t07",
+   "round": 2,
+   "name": "Фильм по машине",
+   "comment": "Назовите фильм",
+   "note": "Взято 5 — нужно ещё 2 из новых.",
+   "questions": [
+    {
+     "id": "t07q1",
+     "pre": true,
+     "price": 200,
+     "text": "Назовите фильм",
+     "image": "Mini Cooper Мистер Бин зелёный",
+     "answer": "«Мистер Бин»",
+     "answerImage": "Мистер Бин в машине",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q2",
+     "pre": true,
+     "price": 400,
+     "text": "Назовите фильм",
+     "image": "Ecto-1 машина",
+     "answer": "«Охотники за привидениями»",
+     "answerImage": "Охотники за привидениями Ecto-1 кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q3",
+     "pre": null,
+     "price": 400,
+     "text": "Назовите фильм",
+     "image": "Peugeot 406 белый такси Марсель",
+     "answer": "«Такси»",
+     "answerImage": "фильм Такси Даниэль Peugeot",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q4",
+     "pre": true,
+     "price": 600,
+     "text": "Назовите фильм",
+     "image": "Aston Martin DB5 серебристый",
+     "answer": "«Голдфингер» / Джеймс Бонд",
+     "answerImage": "Джеймс Бонд Aston Martin DB5",
+     "accept": [
+      "Бонд",
+      "Джеймс Бонд"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q5",
+     "pre": null,
+     "price": 600,
+     "text": "Назовите фильм",
+     "image": "летающий Ford Anglia голубой",
+     "answer": "«Гарри Поттер и Тайная комната»",
+     "answerImage": "Ford Anglia Гарри Поттер кадр",
+     "accept": [
+      "Гарри Поттер"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q6",
+     "pre": true,
+     "price": 800,
+     "text": "Назовите фильм",
+     "image": "BMW E38 чёрная Бумер фильм",
+     "answer": "«Бумер»",
+     "answerImage": "Бумер фильм кадр BMW",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q7",
+     "pre": null,
+     "price": 1000,
+     "text": "Назовите фильм",
+     "image": "Ford Falcon Interceptor чёрный",
+     "answer": "«Безумный Макс»",
+     "answerImage": "Безумный Макс Interceptor кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q8",
+     "pre": true,
+     "price": 1200,
+     "text": "Назовите фильм",
+     "image": "Ford Gran Torino 1972 зелёный",
+     "answer": "«Гран Торино»",
+     "answerImage": "Гран Торино Иствуд кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t07q9",
+     "pre": null,
+     "price": 1400,
+     "text": "Назовите фильм",
+     "image": "Plymouth Fury 1958 красный",
+     "answer": "«Кристина» (Стивен Кинг)",
+     "answerImage": "Кристина фильм 1983 машина",
+     "accept": [
+      "Кристина"
+     ],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t11",
+   "round": 2,
+   "name": "Чья квартира?",
+   "comment": "Назовите фильм или сериал",
+   "note": "Взято 5 — нужно ещё 2 из новых.",
+   "questions": [
+    {
+     "id": "t11q1",
+     "pre": true,
+     "price": 200,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Моники сериал Друзья интерьер",
+     "answer": "«Друзья»",
+     "answerImage": "Друзья квартира Моники кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q2",
+     "pre": true,
+     "price": 400,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Шелдона Теория большого взрыва интерьер",
+     "answer": "«Теория большого взрыва»",
+     "answerImage": "Теория большого взрыва Шелдон на диване",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q3",
+     "pre": true,
+     "price": 600,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Лукашина Ирония судьбы интерьер",
+     "answer": "«Ирония судьбы»",
+     "answerImage": "Ирония судьбы кадр Лукашин Надя",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q4",
+     "pre": true,
+     "price": 800,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Васнецовых Папины дочки интерьер",
+     "answer": "«Папины дочки»",
+     "answerImage": "Папины дочки кадр семья",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q5",
+     "pre": null,
+     "price": 1000,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Шурика Иван Васильевич меняет профессию машина времени интерьер",
+     "answer": "«Иван Васильевич меняет профессию»",
+     "answerImage": "Иван Васильевич меняет профессию квартира Шурика кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q6",
+     "pre": null,
+     "price": 1000,
+     "text": "Назовите фильм или сериал",
+     "image": "квартира Теда Как я встретил вашу маму интерьер",
+     "answer": "«Как я встретил вашу маму»",
+     "answerImage": "Как я встретил вашу маму квартира кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q7",
+     "pre": null,
+     "price": 1200,
+     "text": "Назовите фильм или сериал",
+     "image": "221B Шерлок BBC гостиная интерьер",
+     "answer": "«Шерлок» (BBC)",
+     "answerImage": "Шерлок BBC гостиная 221B",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q8",
+     "pre": null,
+     "price": 1200,
+     "text": "Назовите фильм или сериал",
+     "image": "дом Уайтов Во все тяжкие интерьер",
+     "answer": "«Во все тяжкие»",
+     "answerImage": "Во все тяжкие дом Уолтера Уайта",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t11q9",
+     "pre": true,
+     "price": 1400,
+     "text": "Назовите фильм или сериал",
+     "image": "дом на Пейпер-стрит Бойцовский клуб интерьер",
+     "answer": "«Бойцовский клуб»",
+     "answerImage": "Бойцовский клуб дом Пейпер-стрит кадр",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t14",
+   "round": 3,
+   "name": "Кто под гримом?",
+   "comment": "Кого он сыграл?",
+   "note": "Готово: 7 из 7, цены переставлены.",
+   "questions": [
+    {
+     "id": "t14q1",
+     "pre": true,
+     "price": 300,
+     "text": "Кого он сыграл?",
+     "image": "Энди Серкис фото",
+     "answer": "Голлума",
+     "answerImage": "Голлум Властелин колец",
+     "accept": [
+      "Голлум",
+      "Смеагол"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q2",
+     "pre": true,
+     "price": 600,
+     "text": "Кого он сыграл?",
+     "image": "Питер Мейхью фото без грима",
+     "answer": "Чубакку",
+     "answerImage": "Чубакка Звёздные войны",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q3",
+     "pre": true,
+     "price": 900,
+     "text": "Кого он сыграл?",
+     "image": "Роберт Инглунд фото без грима",
+     "answer": "Фредди Крюгера",
+     "answerImage": "Фредди Крюгер",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q4",
+     "pre": true,
+     "price": 1200,
+     "text": "Кого он сыграл?",
+     "image": "Рон Перлман фото",
+     "answer": "Хеллбоя",
+     "answerImage": "Хеллбой Рон Перлман",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q5",
+     "pre": true,
+     "price": 1500,
+     "text": "Кого он сыграл?",
+     "image": "Кенни Бейкер фото",
+     "answer": "R2-D2",
+     "answerImage": "R2-D2",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q6",
+     "pre": true,
+     "price": 1800,
+     "text": "Кого он сыграл?",
+     "image": "Кейн Ходдер фото без грима",
+     "answer": "Джейсона Вурхиза",
+     "answerImage": "Джейсон Вурхиз маска",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t14q7",
+     "pre": true,
+     "price": 2100,
+     "text": "Кого он сыграл?",
+     "image": "Уорвик Дэвис фото",
+     "answer": "Флитвика / эвока Уикета",
+     "answerImage": "профессор Флитвик",
+     "accept": [
+      "Флитвик",
+      "Уикет",
+      "Лепрекон"
+     ],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t15",
+   "round": 3,
+   "name": "Метро по схеме",
+   "comment": "Какой город?",
+   "note": "Взято 3 — нужно ещё 4 из новых. Москву, Питер и Лондон вы убрали — новые тоже неочевидные.",
+   "questions": [
+    {
+     "id": "t15q1",
+     "pre": null,
+     "price": 300,
+     "text": "Какой город?",
+     "image": "схема метро Парижа",
+     "answer": "Париж",
+     "answerImage": "схема метро Парижа",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q2",
+     "pre": true,
+     "price": 600,
+     "text": "Какой город?",
+     "image": "схема метро Нью-Йорка",
+     "answer": "Нью-Йорк",
+     "answerImage": "New York subway map",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q3",
+     "pre": null,
+     "price": 600,
+     "text": "Какой город?",
+     "image": "схема метро Берлина U-Bahn",
+     "answer": "Берлин",
+     "answerImage": "Berlin U-Bahn map",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q4",
+     "pre": true,
+     "price": 900,
+     "text": "Какой город?",
+     "image": "схема метро Казани",
+     "answer": "Казань (одна линия)",
+     "answerImage": "метро Казани",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q5",
+     "pre": null,
+     "price": 1200,
+     "text": "Какой город?",
+     "image": "схема метро Екатеринбурга",
+     "answer": "Екатеринбург (одна линия)",
+     "answerImage": "метро Екатеринбурга",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q6",
+     "pre": null,
+     "price": 1200,
+     "text": "Какой город?",
+     "image": "схема метро Сеула",
+     "answer": "Сеул",
+     "answerImage": "Seoul subway map",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q7",
+     "pre": null,
+     "price": 1500,
+     "text": "Какой город?",
+     "image": "схема метро Нижнего Новгорода",
+     "answer": "Нижний Новгород",
+     "answerImage": "метро Нижнего Новгорода",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q8",
+     "pre": null,
+     "price": 1500,
+     "text": "Какой город?",
+     "image": "схема метро Ташкента",
+     "answer": "Ташкент",
+     "answerImage": "метро Ташкента",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q9",
+     "pre": null,
+     "price": 1800,
+     "text": "Какой город?",
+     "image": "схема метро Дубая",
+     "answer": "Дубай",
+     "answerImage": "Dubai metro map",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t15q10",
+     "pre": true,
+     "price": 2100,
+     "text": "Какой город?",
+     "image": "схема метро Пхеньяна",
+     "answer": "Пхеньян",
+     "answerImage": "метро Пхеньяна станция",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t16",
+   "round": 3,
+   "name": "Ступни звёзд",
+   "comment": "Тарантино одобряет",
+   "note": "Готово: 7 из 7. Цены: сначала самые медийные, в конце — актрисы, которых знают меньше.",
+   "questions": [
+    {
+     "id": "t16q1",
+     "pre": true,
+     "price": 300,
+     "text": "Чья ступня?",
+     "image": "Ума Турман Убить Билла ступня",
+     "answer": "Ума Турман («Убить Билла»)",
+     "answerImage": "Ума Турман Убить Билла",
+     "accept": [
+      "Ума Турман"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q2",
+     "pre": true,
+     "price": 600,
+     "text": "Чья ступня?",
+     "image": "Сальма Хайек От заката до рассвета нога",
+     "answer": "Сальма Хайек («От заката до рассвета»)",
+     "answerImage": "Сальма Хайек От заката до рассвета танец",
+     "accept": [
+      "Сальма Хайек"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q3",
+     "pre": true,
+     "price": 900,
+     "text": "Чья ступня?",
+     "image": "Ким Кардашьян ступни",
+     "answer": "Ким Кардашьян",
+     "answerImage": "Ким Кардашьян",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q4",
+     "pre": true,
+     "price": 1200,
+     "text": "Чья ступня?",
+     "image": "Меган Фокс ноги большой палец",
+     "answer": "Меган Фокс",
+     "answerImage": "Меган Фокс",
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q5",
+     "pre": true,
+     "price": 1500,
+     "text": "Чья ступня?",
+     "image": "Маргарет Куолли Однажды в Голливуде ноги",
+     "answer": "Маргарет Куолли («Однажды в Голливуде»)",
+     "answerImage": "Маргарет Куолли Однажды в Голливуде",
+     "accept": [
+      "Маргарет Куолли"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q6",
+     "pre": true,
+     "price": 1800,
+     "text": "Чья ступня?",
+     "image": "Дайан Крюгер Бесславные ублюдки туфля ступня",
+     "answer": "Дайан Крюгер («Бесславные ублюдки»)",
+     "answerImage": "Дайан Крюгер Бесславные ублюдки",
+     "accept": [
+      "Дайан Крюгер"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t16q7",
+     "pre": true,
+     "price": 2100,
+     "text": "Чья ступня?",
+     "image": "Бриджит Фонда Джеки Браун ноги",
+     "answer": "Бриджит Фонда («Джеки Браун»)",
+     "answerImage": "Бриджит Фонда Джеки Браун",
+     "accept": [
+      "Бриджит Фонда"
+     ],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  },
+  {
+   "id": "t19",
+   "round": 3,
+   "name": "Рекламы 90-х",
+   "comment": "Назовите продукт",
+   "note": "Взято 9 — два лишних, снимите галочку с двух.",
+   "questions": [
+    {
+     "id": "t19q1",
+     "pre": true,
+     "price": 300,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "МММ (Лёня Голубков)",
+     "answerImage": null,
+     "accept": [
+      "МММ"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q2",
+     "pre": true,
+     "price": 600,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Twix",
+     "answerImage": null,
+     "accept": [
+      "Твикс"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q3",
+     "pre": true,
+     "price": 600,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Инвайт",
+     "answerImage": null,
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q4",
+     "pre": true,
+     "price": 900,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Юппи",
+     "answerImage": null,
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q5",
+     "pre": true,
+     "price": 1200,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Blend-a-med (эксперимент с яйцом)",
+     "answerImage": null,
+     "accept": [
+      "Бленд-а-мед"
+     ],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q6",
+     "pre": true,
+     "price": 1200,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Рондо",
+     "answerImage": null,
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q7",
+     "pre": true,
+     "price": 1500,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Херши-кола",
+     "answerImage": null,
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q8",
+     "pre": true,
+     "price": 1800,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Хопёр-Инвест",
+     "answerImage": null,
+     "accept": [],
+     "options": null,
+     "type": "simple"
+    },
+    {
+     "id": "t19q9",
+     "pre": true,
+     "price": 2100,
+     "text": "Назовите продукт [видео: кусок рекламы без логотипа]",
+     "image": null,
+     "answer": "Банк Империал (исторические ролики)",
+     "answerImage": null,
+     "accept": [
+      "Империал"
+     ],
+     "options": null,
+     "type": "simple"
+    }
+   ]
+  }
+ ]
+}

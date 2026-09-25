@@ -1,0 +1,14 @@
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.siq binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.mp3 binary
+*.mp4 binary
+*.woff2 binary
+*.ico binary
+*.nsh text eol=crlf

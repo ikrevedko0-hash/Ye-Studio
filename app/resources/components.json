@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "note": "Что ставит окно «Компоненты». Версии закреплены, суммы — из API GitHub и Hugging Face (2026-09-25). Пути моделей — от папки модели (components\\model), пути tools — от папки компонентов. Менять вместе с tests/components.test.ts.",
+  "files": {
+    "sd-cuda12": {
+      "title": "sd.cpp (CUDA 12)",
+      "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-905-70c1dbc/sd-master-70c1dbc-bin-win-cuda12-x64.zip",
+      "size": 333393007,
+      "sha256": "81a86718eae9579e3c7bb5775bfedb7ef8e7cdc22ef0ee406d35efe7de668bd3",
+      "unzipTo": "bin"
+    },
+    "cudart12": {
+      "title": "библиотеки CUDA 12",
+      "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-905-70c1dbc/cudart-sd-bin-win-cu12-x64.zip",
+      "size": 563452046,
+      "sha256": "fe20366827d357c00797eebb58244dddab7fd9a348d70090c3871004c320f38d",
+      "unzipTo": "bin"
+    },
+    "sd-vulkan": {
+      "title": "sd.cpp (Vulkan)",
+      "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-905-70c1dbc/sd-master-70c1dbc-bin-win-vulkan-x64.zip",
+      "size": 31963841,
+      "sha256": "5e7ed195290867a1a9d799932b4b2a46fc3a656f1ca08407e4f4ae359079c492",
+      "unzipTo": "bin"
+    },
+    "vae": {
+      "title": "VAE FLUX.2",
+      "url": "https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b/resolve/main/split_files/vae/flux2-vae.safetensors",
+      "size": 336211292,
+      "sha256": "868fe7b343cc8f3a19dbcfcafbc3d5f888802be3f89bd81b65b3621a066ce8f3",
+      "path": "models/vae/flux2-vae.safetensors"
+    },
+    "klein-9b": {
+      "title": "FLUX.2 klein 9B (Q5_K_M)",
+      "url": "https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/resolve/main/flux-2-klein-9b-Q5_K_M.gguf",
+      "size": 7018699040,
+      "sha256": "ad0ace013fb401560ba4a7ff2b2bb3235795f07c19dffebf411806b424700503",
+      "path": "models/diffusion_models/flux-2-klein-9b-Q5_K_M.gguf"
+    },
+    "qwen3-8b": {
+      "title": "Qwen3-8B (Q4_K_M)",
+      "url": "https://huggingface.co/unsloth/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf",
+      "size": 5027784512,
+      "sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
+      "path": "models/text_encoders/Qwen3-8B-Q4_K_M.gguf"
+    },
+    "klein-4b": {
+      "title": "FLUX.2 klein 4B (Q5_K_M)",
+      "url": "https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q5_K_M.gguf",
+      "size": 3073368640,
+      "sha256": "58c01c75fee2272eadb127f53e26dd05a5a8e7f812e37c36fa44603301f91e54",
+      "path": "models/diffusion_models/flux-2-klein-4b-Q5_K_M.gguf"
+    },
+    "qwen3-4b": {
+      "title": "Qwen3-4B (Q4_K_M)",
+      "url": "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+      "size": 2497281312,
+      "sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a",
+      "path": "models/text_encoders/Qwen3-4B-Q4_K_M.gguf"
+    },
+    "yt-dlp-exe": {
+      "title": "yt-dlp 2026.08.19",
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+      "size": 17840399,
+      "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+      "path": "yt-dlp/yt-dlp.exe"
+    },
+    "bgutil-plugin": {
+      "title": "плагин PO-токенов bgutil 2.0.0",
+      "url": "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/2.0.0/bgutil-ytdlp-pot-provider.zip",
+      "size": 8106,
+      "sha256": "bce874dfa25896c2798e0f4f8147b7b22e785479eb1e459ab232bf2506c95016",
+      "path": "yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip"
+    },
+    "ffmpeg-zip": {
+      "title": "ffmpeg 9.0.2 (essentials)",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+      "size": 114768076,
+      "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+      "unzipTo": "ffmpeg",
+      "extract": [
+        "ffmpeg.exe",
+        "ffprobe.exe"
+      ]
+    }
+  },
+  "profiles": {
+    "best": {
+      "files": [
+        "sd-cuda12",
+        "cudart12",
+        "vae",
+        "klein-9b",
+        "qwen3-8b"
+      ],
+      "args": [
+        "--diffusion-model",
+        "models/diffusion_models/flux-2-klein-9b-Q5_K_M.gguf",
+        "--vae",
+        "models/vae/flux2-vae.safetensors",
+        "--llm",
+        "models/text_encoders/Qwen3-8B-Q4_K_M.gguf",
+        "--offload-to-cpu",
+        "--diffusion-fa",
+        "--cfg-scale",
+        "1",
+        "--steps",
+        "4",
+        "--listen-port",
+        "7861"
+      ]
+    },
+    "light": {
+      "files": [
+        "sd-cuda12",
+        "cudart12",
+        "vae",
+        "klein-4b",
+        "qwen3-4b"
+      ],
+      "args": [
+        "--diffusion-model",
+        "models/diffusion_models/flux-2-klein-4b-Q5_K_M.gguf",
+        "--vae",
+        "models/vae/flux2-vae.safetensors",
+        "--llm",
+        "models/text_encoders/Qwen3-4B-Q4_K_M.gguf",
+        "--offload-to-cpu",
+        "--diffusion-fa",
+        "--cfg-scale",
+        "1",
+        "--steps",
+        "4",
+        "--listen-port",
+        "7861"
+      ]
+    },
+    "vulkan": {
+      "files": [
+        "sd-vulkan",
+        "vae",
+        "klein-4b",
+        "qwen3-4b"
+      ],
+      "args": [
+        "--diffusion-model",
+        "models/diffusion_models/flux-2-klein-4b-Q5_K_M.gguf",
+        "--vae",
+        "models/vae/flux2-vae.safetensors",
+        "--llm",
+        "models/text_encoders/Qwen3-4B-Q4_K_M.gguf",
+        "--offload-to-cpu",
+        "--cfg-scale",
+        "1",
+        "--steps",
+        "4",
+        "--listen-port",
+        "7861"
+      ]
+    }
+  },
+  "tools": {
+    "yt-dlp": {
+      "version": "2026.08.19",
+      "files": [
+        "yt-dlp-exe",
+        "bgutil-plugin"
+      ]
+    },
+    "ffmpeg": {
+      "version": "9.0.2",
+      "files": [
+        "ffmpeg-zip"
+      ]
+    }
+  }
+}

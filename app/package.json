@@ -1,0 +1,128 @@
+{
+  "name": "siq-workshop",
+  "productName": "Ye!Studio",
+  "version": "0.2.0-beta.2",
+  "private": true,
+  "description": "Ye!Studio для «Своей игры»: планирование, медиа, сборка .siq",
+  "license": "GPL-3.0-or-later",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "roundtrip": "tsx scripts/roundtrip.ts",
+    "pack": "electron-vite build && electron-builder --win dir",
+    "fetch-dict": "tsx scripts/fetch-dict.ts",
+    "providers-test": "tsx scripts/providers-test.ts",
+    "fetch-wordsets": "tsx scripts/fetch-wordsets.ts",
+    "fetch-initials": "tsx scripts/fetch-initials.ts",
+    "fetch-phrases": "tsx scripts/fetch-phrases.ts",
+    "yt-test": "tsx scripts/youtube-test.ts",
+    "components-test": "tsx scripts/components-test.ts",
+    "ytdlp-component-test": "tsx scripts/ytdlp-component-test.ts",
+    "pot-build": "npm --prefix tools/pot-provider install --no-audit --no-fund && npm --prefix tools/pot-provider exec -- tsc && npm --prefix tools/pot-provider prune --omit=dev",
+    "setup": "electron-vite build && electron-builder --win nsis --config.directories.output=dist-setup",
+    "dist:update": "electron-vite build && electron-builder --win nsis --config.directories.output=dist-setup --publish never"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/rubik": "^5.3.0",
+    "@xmldom/xmldom": "^0.9.12",
+    "electron-updater": "^6.8.9",
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/yauzl": "^2.10.3",
+    "@types/yazl": "^3.3.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^7.0.0",
+    "vitest": "^5.0.1"
+  },
+  "build": {
+    "appId": "net.neurosvoyak.workshop",
+    "productName": "Ye!Studio",
+    "directories": {
+      "output": "dist"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://193.233.112.48:8787/updates/"
+      }
+    ],
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "electronFuses": {
+      "runAsNode": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false
+    },
+    "win": {
+      "target": [
+        "dir"
+      ],
+      "executableName": "PackWorkshop",
+      "signAndEditExecutable": false
+    },
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "tools/pot-provider",
+        "to": "pot-provider",
+        "filter": [
+          "build/**/*",
+          "package.json"
+        ]
+      },
+      {
+        "from": "tools/pot-provider/node_modules",
+        "to": "pot-provider/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Ye!Studio",
+      "installerLanguages": [
+        "ru_RU"
+      ],
+      "language": "1049",
+      "include": "build/installer.nsh",
+      "artifactName": "Ye-Studio-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    }
+  }
+}

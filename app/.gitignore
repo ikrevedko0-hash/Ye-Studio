@@ -1,0 +1,20 @@
+node_modules/
+out/
+dist/
+dist-next/
+.imagegen-out/
+tools/siq-check/bin/
+tools/siq-check/obj/
+tools/pot-provider/node_modules/
+tools/pot-provider/tsconfig.tsbuildinfo
+src/renderer/public/demo/
+brag-output/
+scripts/.cache/
+# словари пересобираются: npm run fetch-dict
+resources/dict/
+*.log
+.tmp-media/
+# ffmpeg/ffprobe для установщика кладутся руками (фаза 6), в git не идут
+resources/bin/
+dist-setup/
+dist-*/

@@ -1,0 +1,27 @@
+[Unit]
+Description=Ye!Studio beta server
+After=network.target
+
+[Service]
+Type=simple
+User=yestudio
+Group=yestudio
+WorkingDirectory=/opt/yestudio
+ExecStart=/usr/bin/python3 /opt/yestudio/yestudio_server.py
+Environment=YES_HOST=0.0.0.0
+Environment=YES_PORT=8787
+Environment=YES_DATA=/opt/yestudio/data
+Restart=on-failure
+RestartSec=3
+
+# Hardening — не должно мешать другим сервисам (VPN, сайт) на этой машине.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/yestudio/data
+PrivateTmp=yes
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target
