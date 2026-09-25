@@ -4,9 +4,12 @@
 // «по смыслу», а для темы нужна буква — автор должен видеть, что именно уйдёт в рисование.
 // Картинка до нажатия «В вопрос» / «В пак» в пак не попадает: неудачные варианты не копятся.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { blankPreset, toTemplate } from "../../core/ai/presetText";
 import { PhrasePicker } from "./PhrasePicker";
-import type { GeneratedImage, ImagePreset, ImageStyleInfo, MediaInfo, QuotaInfo } from "../../shared/api";
+import { PresetEditor } from "./PresetEditor";
+import type { GeneratedImage, ImagePreset, ImageStyleInfo, MediaInfo, QuotaInfo, WorkHit } from "../../shared/api";
+import { Icon } from "./Icon";
 
 interface Props {
   /** Положить картинку в открытый вопрос, фразу — в ответ. Нет выбранного вопроса — нет и кнопки. */
@@ -60,6 +63,14 @@ function loadUsed(): Set<string> {
   }
 }
 
+/** Ответ вопроса — фраза без уточнения для модели в конце: «Солнцестояние (2019)» → «Солнцестояние». */
+function answerOf(phrase: string): string {
+  return phrase.replace(/\s*\([^()]*\)\s*$/, "").trim() || phrase.trim();
+}
+
+/** id своего пресета: время в base36 — коротко и без повторов. */
+const newPresetId = () => `my-${Date.now().toString(36)}`;
+
 function cleanError(e: unknown): string {
   return String((e as Error).message).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
 }
@@ -70,6 +81,14 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   const [phrase, setPhrase] = useState("");
   const [prompt, setPrompt] = useState("");
   const [promptBy, setPromptBy] = useState("");
+  /** Какое произведение узнала модель — чтобы промах был виден до рисования. */
+  const [work, setWork] = useState("");
+  /** Подсказки Wikidata к названию («фильм по детскому рисунку») и выбранное из них произведение. */
+  const [hits, setHits] = useState<WorkHit[]>([]);
+  const [hitIdx, setHitIdx] = useState(-1);
+  const [chosen, setChosen] = useState<WorkHit | null>(null);
+  /** Номер запроса подсказок: ответ на устаревший запрос не показываем. */
+  const hitsSeq = useRef(0);
   const [size, setSize] = useState(SIZES[0].id);
   const [img, setImg] = useState<GeneratedImage | null>(null);
   const [busy, setBusy] = useState<"" | "prompt" | "image" | "save">("");
@@ -86,6 +105,8 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   const [imgStyle, setImgStyle] = useState("");
   /** Бесплатные не нарисовали — какие платные можно попросить. */
   const [paidOffer, setPaidOffer] = useState<string[]>([]);
+  /** Открытый редактор пресета (черновик) и новый ли он. */
+  const [editing, setEditing] = useState<{ preset: ImagePreset; isNew: boolean } | null>(null);
 
   // остатки по сервисам из очереди картинок: учёт ведёт главный процесс, окно только показывает
   const loadQuota = () => void window.api.aiQuota("images").then(setQuota).catch(() => setQuota([]));
@@ -99,14 +120,93 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   }, []);
 
   const current = presets.find((p) => p.id === preset);
+  const suggests = current?.suggest === "works";
+  /** Сцену по фразе строит приложение: моделью или шаблоном. Нет — сцену автор пишет сам, фраза — только ответ. */
+  const fromPhrase = !!current && (current.mode === "model" || !!current.template.trim());
+  const isModel = current?.mode === "model";
+
+  /** Выбрать пресет: сбросить сцену и выставить его начальные размер, «Фантазию» и галочки. */
+  const selectPreset = (p: ImagePreset) => {
+    setPreset(p.id);
+    setPrompt(""); setPromptBy(""); setWork(""); setChosen(null); setHits([]); setSysDraft(null);
+    if (p.size) setSize(p.size);
+    setTemperature(p.temperature ?? loadTemp());
+    setPicked(p.styles.length ? p.styles : loadStyles());
+    setShowDict(false);
+  };
+
+  const savePreset = async (p: ImagePreset) => {
+    try {
+      const list = await window.api.imagePresetPut(p);
+      setPresets(list);
+      setEditing(null);
+      const saved = list.find((x) => x.id === p.id);
+      if (saved) selectPreset(saved);
+      setNote(`Пресет «${p.title}» сохранён.`);
+    } catch (e) {
+      setNote(`Пресет не сохранился: ${cleanError(e)}`);
+    }
+  };
+
+  const removePreset = async (p: ImagePreset) => {
+    try {
+      const list = await window.api.imagePresetDelete(p.id);
+      setPresets(list);
+      setEditing(null);
+      selectPreset(list.find((x) => x.id === p.id) ?? list[0]);
+      setNote(p.builtin ? `«${p.title}» — снова как было исходно.` : `Пресет «${p.title}» удалён.`);
+    } catch (e) {
+      setNote(`Не получилось: ${cleanError(e)}`);
+    }
+  };
+
+  /** «Свой промпт» → пресет-шаблон: фраза в тексте становится {фраза}, текущие стиль и размер — начальными. */
+  const saveAsPreset = () => {
+    const answer = answerOf(phrase);
+    setEditing({
+      isNew: true,
+      preset: {
+        ...blankPreset(newPresetId()),
+        about: "Мой шаблон сцены",
+        example: answer,
+        template: toTemplate(prompt, answer),
+        styles: current?.styleMode === "picks" ? picked : [],
+        size,
+      },
+    });
+  };
+
+  // подсказки — после паузы в наборе; выбранное название заново не ищем
+  useEffect(() => {
+    const q = phrase.trim();
+    const seq = ++hitsSeq.current;
+    if (!suggests || q.length < 2 || chosen?.title === phrase) { setHits([]); return; }
+    const t = setTimeout(() => {
+      window.api.worksSearch(q)
+        .then((r) => { if (seq === hitsSeq.current) { setHits(r); setHitIdx(-1); } })
+        // нет сети или Wikidata не ответила — просто без подсказок, фильм угадает модель
+        .catch(() => { if (seq === hitsSeq.current) setHits([]); });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [phrase, suggests, chosen]);
+
+  const choose = (h: WorkHit) => {
+    setChosen(h);
+    setPhrase(h.title);
+    setHits([]);
+    setPrompt("");
+    setPromptBy("");
+    setWork("");
+  };
   const sysText = sysDraft ?? current?.system ?? "";
   const sysDirty = sysDraft !== null && sysDraft !== current?.system;
 
-  const saveSystem = async (text: string | null) => {
+  const saveSystem = async (text: string) => {
+    if (!current) return;
     try {
-      setPresets(await window.api.imagePresetSave(preset, text));
+      setPresets(await window.api.imagePresetPut({ ...current, system: text }));
       setSysDraft(null);
-      setNote(text === null ? "Вернула исходную инструкцию." : "Инструкция сохранена — «Другая сцена» пойдёт уже по ней.");
+      setNote("Инструкция сохранена — «Другая сцена» пойдёт уже по ней.");
     } catch (e) {
       setNote(`Инструкция не сохранилась: ${cleanError(e)}`);
     }
@@ -117,9 +217,10 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
     setBusy("prompt");
     setNote("");
     try {
-      const r = await window.api.imagePrompt(phrase, preset, temperature);
+      const r = await window.api.imagePrompt(phrase, preset, temperature, suggests && chosen ? chosen : undefined);
       setPrompt(r.text);
       setPromptBy(r.model);
+      setWork(r.work ?? "");
       return r.text;
     } catch (e) {
       setNote(`Сцену придумать не получилось: ${cleanError(e)}`);
@@ -137,7 +238,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
 
   /** Стиль для очередного рисунка: из отмеченных случайный, ничего не отмечено — из всех. */
   const nextStyle = (): string => {
-    if (!current?.styled || !styles.length) return "";
+    if (current?.styleMode !== "picks" || !styles.length) return "";
     const pool = picked.filter((id) => styles.some((s) => s.id === id));
     const from = pool.length ? pool : styles.map((s) => s.id);
     return from[Math.floor(Math.random() * from.length)];
@@ -151,14 +252,15 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
     setNote("");
     setPaidOffer([]);
     try {
-      const r = await window.api.imageGenerate(text, s.w, s.h, allowPaid, style);
+      const own = current?.styleMode === "own" ? current.styleText.trim() : "";
+      const r = await window.api.imageGenerate(text, s.w, s.h, allowPaid, style, own || undefined);
       if ("needPaid" in r) {
         setPaidOffer(r.needPaid);
         setNote(`Бесплатные модели не нарисовали: ${r.skipped.join(" · ")}`);
         return;
       }
       setImg(r);
-      setImgStyle(styles.find((x) => x.id === style)?.title ?? "");
+      setImgStyle(own ? "стиль пресета" : styles.find((x) => x.id === style)?.title ?? "");
     } catch (e) {
       setNote(`Не нарисовалось: ${cleanError(e)}`);
     } finally {
@@ -169,26 +271,29 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
 
   /** Главная кнопка: если промпта ещё нет или фраза поменялась — сначала сцена, потом рисунок. */
   const both = async () => {
-    // в «своём промпте» фраза — только ответ, рисовать надо то, что автор написал в сцене
-    if (!current?.system && !prompt.trim()) { setNote("Опишите сцену в поле ниже."); return; }
+    // без модели и шаблона фраза — только ответ, рисовать надо то, что автор написал в сцене
+    if (!fromPhrase && !prompt.trim()) { setNote("Опишите сцену в поле ниже."); return; }
     const text = prompt.trim() ? prompt : await makePrompt();
     if (text) await draw(text);
   };
 
   const save = async (toQuestion: boolean) => {
     if (!img) return;
+    const answer = answerOf(phrase);
     setBusy("save");
     try {
-      const created = await window.api.imageKeep(img.dataUrl, phrase.trim(), { model: img.model, style: imgStyle || undefined, prompt });
+      const created = await window.api.imageKeep(img.dataUrl, answer, { model: img.model, style: imgStyle || undefined, prompt });
       if (toQuestion && onInsert) {
-        onInsert(created, phrase.trim());
-        const next = new Set(used).add(phrase.trim());
+        onInsert(created, answer);
+        const next = new Set(used).add(answer);
         setUsed(next);
         try { localStorage.setItem(USED_KEY, JSON.stringify([...next])); } catch { /* пометка не запомнится — не беда */ }
-        setNote(`«${phrase.trim()}» вставлено в вопрос. Выбор перешёл к следующему — пишите новую фразу.`);
+        setNote(`«${answer}» вставлено в вопрос. Выбор перешёл к следующему — пишите новую фразу.`);
         setPhrase("");
         setPrompt("");
         setPromptBy("");
+        setWork("");
+        setChosen(null);
         setImg(null);
       } else {
         onAdded(created);
@@ -209,13 +314,35 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
         {presets.map((p) => (
           <button
             key={p.id}
-            className={`ws-gen${preset === p.id ? " sel" : ""}`}
-            onClick={() => { setPreset(p.id); setPrompt(""); setPromptBy(""); setSysDraft(null); }}
+            className={`ws-gen${preset === p.id ? " sel" : ""}${p.builtin ? "" : " own"}`}
+            onClick={() => { setEditing(null); selectPreset(p); }}
           >
-            <b>{p.title}</b>
-            <span className="muted">{p.about}</span>
+            <b>{p.title}{p.edited ? " *" : ""}</b>
+            {p.about && <span className="muted">{p.about}</span>}
           </button>
         ))}
+        <div className="ig-preset-tools">
+          {current?.id === "free" && prompt.trim() && (
+            <button className="small primary" onClick={saveAsPreset} title="Сцена станет шаблоном: фраза в ней заменится на {фраза}, стиль и размер запомнятся">
+              <Icon name="save" size={12} />Сохранить как пресет
+            </button>
+          )}
+          {current && (
+            <button className="small" onClick={() => setEditing({ preset: current, isNew: false })} title="Инструкция, примеры, словарь уточнений, стиль, размер">
+              <Icon name="pencil" size={12} />Настроить
+            </button>
+          )}
+          {current && (
+            <button
+              className="small"
+              onClick={() => setEditing({ isNew: true, preset: { ...current, id: newPresetId(), title: `${current.title} (копия)`, builtin: undefined, edited: undefined } })}
+              title="Свой пресет на основе этого"
+            >
+              Дублировать
+            </button>
+          )}
+          <button className="small" onClick={() => setEditing({ isNew: true, preset: blankPreset(newPresetId()) })}><Icon name="plus" size={12} />Новый</button>
+        </div>
         <span className="spacer" />
         <div className="ig-quota">
           {quota.map((q) => (
@@ -223,25 +350,78 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
               <span className={`ai-dot ${q.level}`} /> <b>{q.provider}</b>: <span className="muted">{q.text}</span>
             </div>
           ))}
-          {onOpenAi && <button className="small" onClick={onOpenAi}>⚙ Ключи и модели</button>}
+          {onOpenAi && <button className="small" onClick={onOpenAi}><Icon name="gear" />Ключи и модели</button>}
         </div>
       </div>
 
+      {editing ? (
+        <PresetEditor
+          key={editing.preset.id}
+          preset={editing.preset}
+          isNew={editing.isNew}
+          styles={styles}
+          sizes={SIZES}
+          onSave={(p) => void savePreset(p)}
+          onCancel={() => setEditing(null)}
+          onDelete={(p) => void removePreset(p)}
+        />
+      ) : (
       <div className="ws-main ig-main">
         <div className="ws-params">
           <label className="ig-phrase">
-            {current?.system ? "Фраза (она же ответ)" : "Ответ"}
+            <span>
+              {fromPhrase ? "Фраза (она же ответ)" : "Ответ"}
+              {suggests && chosen && (
+                <span className="ig-chosen" title="Фильм выбран из Wikidata: модель не угадывает его, а получает готовым вместе с кратким сюжетом">
+                  · {chosen.about}
+                  <button className="small" onClick={() => setChosen(null)} title="Не привязывать к этому произведению — пусть модель угадает сама">×</button>
+                </span>
+              )}
+            </span>
             <input
               value={phrase}
-              placeholder={current ? `например: ${current.system ? current.example : "кот-король"}` : ""}
-              onChange={(e) => { setPhrase(e.target.value); if (current?.system) { setPrompt(""); setPromptBy(""); } }}
-              onKeyDown={(e) => { if (e.key === "Enter" && !busy) void both(); }}
+              placeholder={current ? `например: ${fromPhrase ? current.example : "кот-король"}` : ""}
+              onChange={(e) => {
+                setPhrase(e.target.value);
+                if (chosen && e.target.value !== chosen.title) setChosen(null);
+                if (fromPhrase) { setPrompt(""); setPromptBy(""); setWork(""); }
+              }}
+              onKeyDown={(e) => {
+                if (hits.length && e.key === "ArrowDown") { e.preventDefault(); setHitIdx((i) => (i + 1) % hits.length); return; }
+                if (hits.length && e.key === "ArrowUp") { e.preventDefault(); setHitIdx((i) => (i <= 0 ? hits.length : i) - 1); return; }
+                if (hits.length && e.key === "Escape") { setHits([]); return; }
+                if (e.key !== "Enter") return;
+                if (hits.length && hitIdx >= 0) { choose(hits[hitIdx]); return; }
+                setHits([]);
+                if (!busy) void both();
+              }}
+              onBlur={() => setHits([])}
+              role={suggests ? "combobox" : undefined}
+              aria-expanded={suggests ? hits.length > 0 : undefined}
+              aria-controls={suggests ? "ig-works" : undefined}
               autoFocus
             />
+            {hits.length > 0 && (
+              <ul className="ig-works" id="ig-works" role="listbox">
+                {hits.map((h, i) => (
+                  <li
+                    key={h.id}
+                    role="option"
+                    aria-selected={i === hitIdx}
+                    className={i === hitIdx ? "sel" : undefined}
+                    // mousedown, а не click: иначе поле теряет фокус и закрывает список раньше выбора
+                    onMouseDown={(e) => { e.preventDefault(); choose(h); }}
+                    onMouseEnter={() => setHitIdx(i)}
+                  >
+                    <b>{h.title}</b> <span className="muted">{h.about}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </label>
-          {current?.id === "literal" && (
+          {current?.suggest === "phrases" && (
             <button className={`ig-dict-toggle${showDict ? " sel" : ""}`} onClick={() => setShowDict(!showDict)} title="Выбрать фразу из словаря Викисловаря">
-              📖 Словарь
+              <Icon name="library" />Словарь
             </button>
           )}
           <label className="narrow">
@@ -258,13 +438,14 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
         <label className="ig-prompt">
           <span>
             Сцена для рисования {promptBy && <span className="muted">— придумала {shortModel(promptBy)}</span>}
-            {current?.system && (
+            {work && <span className="muted" title="Не тот фильм? Допишите уточнение в скобках: «Солнцестояние (2019)» или «(Midsommar)» — и «Другая сцена»">· узнала: <b>{work}</b></span>}
+            {fromPhrase && (
               <button className="small" onClick={() => void makePrompt()} disabled={!!busy || !phrase.trim()} title="Попросить модель описать сцену заново">
                 Другая сцена
               </button>
             )}
           </span>
-          {current?.system && (
+          {isModel && (
             <span className="ig-temp" title="Температура текстовой модели: чем выше, тем неожиданнее сцена. Выше 1.2 модель иногда уходит от фразы — жмите «Другая сцена».">
               Фантазия
               <input
@@ -281,12 +462,12 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
           <textarea
             value={prompt}
             rows={3}
-            placeholder={current?.system ? "Появится здесь после «Нарисовать» — можно поправить и перерисовать" : current?.example}
+            placeholder={fromPhrase ? "Появится здесь после «Нарисовать» — можно поправить и перерисовать" : current?.example}
             onChange={(e) => { setPrompt(e.target.value); setPromptBy(""); }}
           />
         </label>
 
-        {current?.styled && styles.length > 0 && (
+        {current?.styleMode === "picks" && styles.length > 0 && (
           <div className="ig-styles">
             <span className="ig-styles-head">
               Стиль
@@ -303,18 +484,17 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
           </div>
         )}
 
-        {current?.system && (
+        {isModel && current && (
           <details className="ig-system">
             <summary>
-              Инструкция для текстовой модели{current.edited ? " (ваша)" : ""}
+              Инструкция для текстовой модели{current.edited || !current.builtin ? " (ваша)" : ""}
               <span className="muted"> — как она превращает фразу в сцену</span>
             </summary>
             <textarea value={sysText} rows={9} spellCheck={false} onChange={(e) => setSysDraft(e.target.value)} />
             <div className="ig-system-bar">
-              <span className="muted">К сцене приложение само дописывает стиль с галочек и «No text, no letters…», чтобы на картинке не было подписей.</span>
+              <span className="muted">Примеры, словарь уточнений и общие правила приложение дописывает само — целиком видно в «Настроить». К сцене — стиль и «No text, no letters…».</span>
               <span className="spacer" />
               {sysDirty && <button className="small" onClick={() => setSysDraft(null)}>Отменить правку</button>}
-              {current.edited && !sysDirty && <button className="small" onClick={() => void saveSystem(null)}>Вернуть исходную</button>}
               <button className="small primary" disabled={!sysDirty || !sysText.trim()} onClick={() => void saveSystem(sysText)}>Сохранить</button>
             </div>
           </details>
@@ -324,7 +504,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
         {paidOffer.length > 0 && (
           <div className="ig-paid">
             <span>Можно нарисовать платной моделью: <b>{paidOffer.join(", ")}</b>. Это тратит деньги с баланса сервиса.</span>
-            <button className="primary" onClick={() => void draw(prompt, true)} disabled={!!busy}>💰 Нарисовать платной</button>
+            <button className="primary" onClick={() => void draw(prompt, true)} disabled={!!busy}>Нарисовать платной ₽</button>
           </div>
         )}
 
@@ -337,7 +517,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
               <span className="muted">{busy === "image" ? "Рисую: облако — секунды, своя видеокарта — ~15 с (первая картинка дольше)…" : "Здесь появится картинка"}</span>
             )}
           </div>
-          {showDict && current?.id === "literal" && (
+          {showDict && current?.suggest === "phrases" && (
             <PhrasePicker
               used={used}
               onPick={(t) => { setPhrase(t); setPrompt(""); setPromptBy(""); setImg(null); }}
@@ -366,6 +546,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

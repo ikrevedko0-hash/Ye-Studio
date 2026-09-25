@@ -1,134 +1,137 @@
-// Стили генерации для тем на картинках. Новый стиль — новая запись в списке, окно подхватит само.
-// Инструкцию (системный промпт) автор видит и правит в окне; правки лежат в image-prompts.json
-// в папке приложения, исходный текст остаётся здесь и возвращается кнопкой «Вернуть исходную».
+// Пресеты картинок на диске и фраза → сцена. Сами пресеты и сборка инструкции — в presetText.ts
+// (без файлов: его читает и окно). Новый встроенный пресет — новая запись в BUILTIN_PRESETS.
 //
-// Модели картинок понимают русские идиомы плохо и склонны рисовать смысл, а не слова.
-// Поэтому сначала текстовая модель превращает фразу в буквальное описание сцены по-английски,
-// и уже его автор видит, правит и отдаёт в рисование.
+// Свои пресеты автора и правки встроенных лежат в image-presets.json в папке приложения. Встроенный
+// не удаляется: правка хранится поверх исходного, «Вернуть исходный» её убирает. Старый image-prompts.json
+// (только правки инструкций, до своих пресетов) читаем, пока в новом файле правки того же пресета нет.
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { chat, type ChatResult } from "./chat";
 import type { AiConfig } from "./config";
+import { assembleSystem, BUILTIN_PRESETS, fillTemplate, NO_TEXT, normalizePreset, sameContent, type ImagePreset } from "./presetText";
+import { workContext, workLabel, type WorkDetails } from "./works";
 
-export interface ImagePreset {
-  id: string;
-  title: string;
-  about: string;
-  /** Пример фразы для подсказки в поле ввода. */
-  example: string;
-  /** Нет инструкции — фраза уходит в рисование как есть (автор пишет промпт сам). */
-  system?: string;
-  /** К сцене дописывается стиль, выбранный галочками в окне (imageStyles.ts). У «детского рисунка» стиль свой. */
-  styled?: boolean;
-  /** Инструкция из кода — к ней возвращает «Вернуть исходную». */
-  defaultSystem?: string;
-  /** Автор правил инструкцию в окне. */
-  edited?: boolean;
+export type { ImagePreset } from "./presetText";
+
+interface PresetFile {
+  /** Свои пресеты автора — в порядке колонки. */
+  own: ImagePreset[];
+  /** Правки встроенных: id → пресет целиком. */
+  builtins: Record<string, ImagePreset>;
 }
 
-const RULES =
-  "Reply with ONLY the image prompt in English: 2-4 sentences, no preamble, no quotes, no lists. " +
-  "The picture must contain NO text, letters, captions or signs, because players must guess the phrase. " +
-  "Never write the original phrase itself in the prompt.";
+let dir = "";
 
-const NO_TEXT = "No text, no letters, no words, no signature anywhere in the image.";
-
-export const IMAGE_PRESETS: ImagePreset[] = [
-  {
-    id: "literal",
-    title: "Поговорка по-ИИшному",
-    about: "Фразеологизм или выражение, нарисованное дословно",
-    example: "ядрёна вошь",
-    styled: true,
-    system:
-      // Без жёстких запретов модель уходила в аллегории: на «без труда не выловишь и рыбку из пруда»
-      // выдала «пустую оболочку рабочего, олицетворяющую отсутствие труда» — такое не нарисовать и не угадать.
-      "You turn Russian idioms, sayings and set phrases into prompts for an image model. " +
-      "Method: take the key nouns and verbs of the phrase in their most LITERAL, physical, everyday sense and build ONE simple scene " +
-      "where those objects and actions are shown directly, as absurd reality. Ignore the figurative meaning completely. " +
-      "Describe only concrete visible things: objects, creatures, people, their poses, actions, sizes, materials, place. " +
-      "FORBIDDEN: symbols, metaphors, allegories, personification of ideas, emotions as abstractions, words like " +
-      "'representing', 'symbolizing', 'embodying', 'absence of', 'concept of'; hollow shells, ghosts or silhouettes standing for ideas. " +
-      "Examples: «ядрёна вошь» → a gigantic louse towering over a city, a nuclear mushroom cloud exploding right behind it. " +
-      "«вешать лапшу на уши» → a man calmly hanging long wet noodles over another man's ears with his fingers. " +
-      "«когда рак на горе свистнет» → a red crayfish standing on a snowy mountain peak, whistling with two claws in its mouth. " +
-      "The 1-3 key objects must be large, centered and instantly recognizable; the background must not distract from them. " +
-      "Make the scene vivid: exaggerate sizes, give creatures and people expressive poses and faces. " +
-      // Стиль выбирает автор галочками в окне, и приложение дописывает его само (imageStyles.ts):
-      // так смена стиля не требует новой сцены. Свой стиль модели только спорил бы с выбранным.
-      "Do NOT mention any art style, medium, rendering, lighting or camera — the style is added separately. " +
-      RULES,
-  },
-  {
-    id: "kids",
-    title: "Фильм по детскому рисунку",
-    about: "Узнаваемая сцена фильма, мультфильма или книги, нарисованная ребёнком",
-    example: "Титаник",
-    system:
-      "You turn a Russian or international film, cartoon or book title into a prompt for an image model. " +
-      "Pick the single most iconic, instantly recognizable scene or character of that work and describe it as " +
-      "a drawing by a 6-year-old child: wax crayons and felt-tip pens on white paper, wobbly lines, naive proportions, " +
-      "bright uneven colouring, scribbled sun in the corner. Describe concrete visual details that make it guessable. " +
-      RULES,
-  },
-  {
-    id: "free",
-    title: "Свой промпт",
-    about: "Описание сцены пишете сами (лучше по-английски), текстовая модель не нужна",
-    example: "a cat wearing a crown sitting on a throne made of fish",
-    styled: true,
-  },
-];
-
-let promptsFile = "";
-
-export function setPromptsFile(path: string): void {
-  promptsFile = path;
+export function setPresetsDir(path: string): void {
+  dir = path;
 }
 
-/** Правки автора: id стиля → инструкция. Файла нет или он битый — правок нет. */
-function edits(): Record<string, string> {
-  if (!promptsFile) return {};
+const presetsPath = () => join(dir, "image-presets.json");
+
+function readJson(path: string): unknown {
   try {
-    return JSON.parse(readFileSync(promptsFile, "utf8")) as Record<string, string>;
+    return JSON.parse(readFileSync(path, "utf8"));
   } catch {
-    return {};
+    return null;
   }
 }
 
-export function presetInfos(): ImagePreset[] {
-  const own = edits();
-  return IMAGE_PRESETS.map((p) => {
-    if (!p.system) return p;
-    const text = own[p.id]?.trim();
-    return { ...p, defaultSystem: p.system, system: text || p.system, edited: !!text && text !== p.system };
-  });
+/** Файл пресетов. Нет его или он битый — пусто: встроенные остаются как в коде. */
+function load(): PresetFile {
+  if (!dir) return { own: [], builtins: {} };
+  const raw = (readJson(presetsPath()) ?? {}) as Partial<Record<keyof PresetFile, unknown>>;
+  const own = Array.isArray(raw.own)
+    ? raw.own.map((p) => normalizePreset(p)).filter((p): p is ImagePreset => !!p && !BUILTIN_PRESETS.some((b) => b.id === p.id))
+    : [];
+  const builtins: Record<string, ImagePreset> = {};
+  const legacy = (readJson(join(dir, "image-prompts.json")) ?? {}) as Record<string, unknown>;
+  for (const b of BUILTIN_PRESETS) {
+    const saved = (raw.builtins as Record<string, unknown> | undefined)?.[b.id];
+    const p = saved ? normalizePreset({ ...(saved as object), id: b.id }, b) : null;
+    if (p) builtins[b.id] = p;
+    else if (typeof legacy[b.id] === "string" && (legacy[b.id] as string).trim()) builtins[b.id] = { ...b, system: (legacy[b.id] as string).trim() };
+  }
+  return { own, builtins };
 }
 
-/** Сохранить инструкцию стиля. Пустая или совпала с исходной — правка удаляется. */
-export function savePresetPrompt(id: string, text: string | null): ImagePreset[] {
-  const base = IMAGE_PRESETS.find((p) => p.id === id);
-  if (!base?.system) throw new Error("у этого стиля нет инструкции");
-  if (!promptsFile) throw new Error("не задан файл для инструкций");
-  const own = edits();
-  const t = text?.trim();
-  if (t && t !== base.system) own[id] = t;
-  else delete own[id];
-  writeFileSync(promptsFile, JSON.stringify(own, null, 1));
+function store(f: PresetFile): void {
+  if (!dir) throw new Error("не задана папка для пресетов");
+  writeFileSync(presetsPath(), JSON.stringify(f, null, 1));
+}
+
+export function presetInfos(): ImagePreset[] {
+  const f = load();
+  const builtins = BUILTIN_PRESETS.map((b) => {
+    const p = f.builtins[b.id];
+    return p && !sameContent(p, b) ? { ...p, builtin: true, edited: true } : b;
+  });
+  return [...builtins, ...f.own];
+}
+
+/** Сохранить пресет: встроенный — правкой поверх исходного, свой — новым или на месте прежнего. */
+export function putPreset(raw: ImagePreset): ImagePreset[] {
+  const base = BUILTIN_PRESETS.find((b) => b.id === raw.id);
+  const p = normalizePreset(raw, base);
+  if (!p) throw new Error("пресет без id");
+  const f = load();
+  if (base) {
+    if (sameContent(p, base)) delete f.builtins[base.id];
+    else f.builtins[base.id] = { ...p, builtin: undefined };
+  } else {
+    const i = f.own.findIndex((x) => x.id === p.id);
+    if (i >= 0) f.own[i] = p;
+    else f.own.push(p);
+  }
+  store(f);
   return presetInfos();
 }
 
-/** Фраза → промпт для рисования. У «своего промпта» возвращаем фразу как есть. */
-export async function phraseToPrompt(cfg: AiConfig, phrase: string, presetId: string, signal?: AbortSignal, temperature?: number): Promise<ChatResult> {
+/** Удалить свой пресет; у встроенного — убрать правку («Вернуть исходный»). */
+export function deletePreset(id: string): ImagePreset[] {
+  const f = load();
+  if (BUILTIN_PRESETS.some((b) => b.id === id)) delete f.builtins[id];
+  else f.own = f.own.filter((p) => p.id !== id);
+  store(f);
+  return presetInfos();
+}
+
+export interface ScenePrompt extends ChatResult {
+  /** Какое произведение узнала модель (строка WORK: у «фильма по детскому рисунку»). */
+  work?: string;
+}
+
+/** Отделить строку «WORK: …» от сцены. Нет её — сцена целиком. */
+export function splitWork(raw: string): { work?: string; scene: string } {
+  const m = /^[\s*_`]*WORK:\s*(.+?)[\s*_`]*$/im.exec(raw);
+  if (!m) return { scene: raw.trim() };
+  const scene = (raw.slice(0, m.index) + raw.slice(m.index + m[0].length)).trim();
+  return { work: m[1].trim(), scene };
+}
+
+/** Запрет подписей текстовая модель помнит, но в промпт почти не пишет, а flux без него ставит подпись. */
+function withNoText(p: ImagePreset, text: string): string {
+  return !p.noText || !text || /no text/i.test(text) ? text : `${text} ${NO_TEXT}`;
+}
+
+/**
+ * Фраза → промпт для рисования. Шаблон — подстановка без модели (пустой шаблон — фраза как есть).
+ * known — произведение, выбранное из списка Wikidata: модели остаётся только сцена.
+ */
+export async function phraseToPrompt(
+  cfg: AiConfig, phrase: string, presetId: string, signal?: AbortSignal, temperature?: number, known?: WorkDetails,
+): Promise<ScenePrompt> {
   const all = presetInfos();
   const preset = all.find((p) => p.id === presetId) ?? all[0];
-  if (!preset.system) return { text: phrase.trim(), model: "", skipped: [] };
+  if (preset.mode === "template") {
+    const text = preset.template.trim() ? fillTemplate(preset.template, phrase) : phrase.trim();
+    return { text: withNoText(preset, text), model: "", skipped: [] };
+  }
   const r = await chat(cfg, [
-    { role: "system", content: preset.system },
-    { role: "user", content: phrase.trim() },
-  ], signal, { temperature });
-  // Запрет на надписи текстовая модель помнит, но в промпт почти никогда не пишет, а без него
-  // модель рисования охотно ставит подпись («Jack» у воды на «Титанике») — и та выдаёт ответ.
-  const text = r.text.replace(/^["«']+|["»']+$/g, "").trim();
-  return { ...r, text: /no text/i.test(text) ? text : `${text} ${NO_TEXT}` };
+    { role: "system", content: assembleSystem(preset) },
+    { role: "user", content: known ? `${phrase.trim()}\n\n${workContext(known)}` : phrase.trim() },
+  ], signal, { temperature: temperature ?? preset.temperature });
+  const { work, scene } = splitWork(r.text);
+  const text = scene.replace(/^["«']+|["»']+$/g, "").trim();
+  return { ...r, work: known ? workLabel(known) : work, text: withNoText(preset, text) };
 }

@@ -11,7 +11,7 @@
 import { spawn } from "node:child_process";
 import { app, type BrowserWindow } from "electron";
 
-const TEST_FLAGS = /^--(selftest|shot|save-copy|new-with-media|rename-theme|ai-settings|imagegen-test|image-test|collage-test|media-center|word-studio|split|yt-diagnose|library-test|yt-login-test|proposals|system-probe|first-run|board-test|point-test|pixelate-test|pixelate-theme|silhouette-test|logo-test|pack-size|assistant-setup|poster)=/;
+const TEST_FLAGS = /^--(selftest|shot|save-copy|new-with-media|rename-theme|ai-settings|imagegen-test|works-test|preset-test|image-test|collage-test|media-center|word-studio|split|yt-diagnose|library-test|yt-login-test|proposals|system-probe|first-run|board-test|point-test|pixelate-test|pixelate-theme|silhouette-test|logo-test|pack-size|assistant-setup|poster)=/;
 
 /** Запущено ли приложение самопроверкой (любой из её флагов). */
 export const SELF_TEST = process.argv.some((a) => TEST_FLAGS.test(a));

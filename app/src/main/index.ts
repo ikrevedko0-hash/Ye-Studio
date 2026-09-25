@@ -32,7 +32,8 @@ import type { GeneratorArgs } from "../core/words/generators/types";
 import { findAiConfig, loadAiConfig } from "../core/ai/config";
 import { generateImage, NeedPaidError } from "../core/ai/image";
 import { IMAGE_STYLES, styleText } from "../core/ai/imageStyles";
-import { phraseToPrompt, presetInfos, savePresetPrompt, setPromptsFile } from "../core/ai/imagePresets";
+import { deletePreset, phraseToPrompt, presetInfos, putPreset, setPresetsDir, type ImagePreset } from "../core/ai/imagePresets";
+import { searchWorks, workDetails, type WorkDetails, type WorkHit } from "../core/ai/works";
 import { setLaunchBase, stopLocalServers } from "../core/ai/localServer";
 import { componentsDir, setComponentsDirOverride } from "./components";
 import { probeSystem } from "./system";
@@ -1164,7 +1165,7 @@ function registerIpc() {
   // через тот же image:save, что и редактор картинок: второй путь записи в пак не нужен.
 
   let imagegenAbort: AbortController | undefined;
-  setPromptsFile(join(baseDir(), "image-prompts.json"));
+  setPresetsDir(baseDir());
   ipcMain.handle("imagegen:presets", () => presetInfos());
   ipcMain.handle("phrases:get", async () => ({
     // dict() задаёт папки наборов: без него словарь фраз «не скачан», пока не открыта вкладка «Слова»
@@ -1172,20 +1173,32 @@ function registerIpc() {
     kinds: PHRASE_KINDS.map(({ id, title }) => ({ id, title })),
     styles: PHRASE_STYLES.map(({ id, title }) => ({ id, title })),
   }));
-  ipcMain.handle("imagegen:savePrompt", (_e, id: string, text: string | null) => savePresetPrompt(id, text));
+  ipcMain.handle("imagegen:putPreset", (_e, p: ImagePreset) => putPreset(p));
+  ipcMain.handle("imagegen:deletePreset", (_e, id: string) => deletePreset(id));
   // sd-server держит ~11 ГБ памяти — уходит вместе с приложением
   app.on("will-quit", stopLocalServers);
-  ipcMain.handle("imagegen:prompt", async (_e, phrase: string, preset: string, temperature?: number) => {
+  ipcMain.handle("imagegen:prompt", async (_e, phrase: string, preset: string, temperature?: number, work?: WorkHit) => {
     imagegenAbort = new AbortController();
     const { cfg } = await loadAiConfig(baseDir());
-    return phraseToPrompt(cfg, phrase, preset, imagegenAbort.signal, temperature);
+    // Википедия не ответила — не беда: модель угадает фильм сама, как до списка
+    let known: WorkDetails | undefined;
+    if (work) known = await workDetails(work.id, work, imagegenAbort.signal).catch(() => undefined);
+    return phraseToPrompt(cfg, phrase, preset, imagegenAbort.signal, temperature, known);
+  });
+  // подсказки к названию фильма: каждый новый запрос отменяет прежний, иначе старый ответ может прийти последним
+  let worksAbort: AbortController | undefined;
+  ipcMain.handle("works:search", (_e, query: string) => {
+    worksAbort?.abort();
+    worksAbort = new AbortController();
+    return searchWorks(query, worksAbort.signal);
   });
   ipcMain.handle("imagegen:styles", () => IMAGE_STYLES.map(({ id, title, about }) => ({ id, title, about })));
-  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string) => {
+  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string, ownStyle?: string) => {
     imagegenAbort = new AbortController();
     const { cfg } = await loadAiConfig(baseDir());
     // стиль — хвостом к сцене: сцена в окне остаётся чистой, а смена стиля не требует новой сцены
-    const full = [prompt.trim(), styleText(style)].filter(Boolean).join(" ");
+    // ownStyle — свой текст стиля пресета (детский рисунок и пресеты автора) вместо галочки
+    const full = [prompt.trim(), ownStyle?.trim() || styleText(style)].filter(Boolean).join(" ");
     try {
       const r = await generateImage(cfg, { prompt: full, width, height }, imagegenAbort.signal, { allowPaid });
       return { dataUrl: `data:${r.mime};base64,${r.data.toString("base64")}`, model: r.model, ms: r.ms, skipped: r.skipped };
@@ -1468,6 +1481,13 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --imagegen-test=<фраза> [--imagegen-preset=<название>] [--imagegen-again=1]
  *                                     фраза «словарь» — взять случайную шутливую из словаря; again — проверить «Ещё вариант»;
  *                                     вкладка «Картинки»: нарисовать по-настоящему и вставить во второй вопрос;
+ *   --works-test=<png> [--works-query=<начало названия>]
+ *                                     «Фильм по детскому рисунку»: подсказки Wikidata к названию — снимок списка,
+ *                                     выбрать первый стрелкой и Enter, без рисования;
+ *                                     --works-preset=<стиль> — только снимок строки с полем в другом стиле;
+ *   --preset-test=<png>              свои пресеты картинок: сохранить «Свой промпт» пресетом, подставить фразу,
+ *                                     сделать инструкцией, удалить; снимки <png>-1…4. Пресеты пишутся в baseDir —
+ *                                     запускать с PORTABLE_EXECUTABLE_DIR на временную папку;
  *   --hold=1                          вместе с проверками выше: только открыть и наполнить, не нажимать применение (для снимка).
  */
 async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefined) {
@@ -1521,7 +1541,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -2758,6 +2778,162 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     if (!result?.ok) process.exitCode = 1;
   }
 
+  // Свои пресеты картинок: «Свой промпт» → пресет-шаблон → подстановка фразы → инструкция → удаление.
+  // Пресеты пишутся в baseDir(): запускать с PORTABLE_EXECUTABLE_DIR на временную папку, чтобы не трогать настоящие.
+  const presetShot = arg("preset-test");
+  if (data && presetShot) {
+    const shot = async (name: string) => writeFile(presetShot.replace(/\.png$/i, `-${name}.png`), (await win.webContents.capturePage()).toPNG());
+    const js = (code: string) => win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      const type = (el, v) => {
+        const proto = el.tagName === "TEXTAREA" ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        Object.getOwnPropertyDescriptor(proto, "value").set.call(el, v);
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      ${code}
+    })()`);
+    const steps: Record<string, unknown> = {};
+    const fail = (why: string) => { steps.why = why; return false; };
+    const ok = await (async () => {
+      const opened = await js(`
+        let btn = null;
+        for (let i = 0; i < 60 && !btn; i++) { await wait(100); btn = document.querySelector(".tb-studio") ?? byText(".file-actions button", "Студия"); }
+        if (!btn) return "нет кнопки «Студия»";
+        btn.click();
+        let tab = null;
+        for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
+        if (!tab) return "нет вкладки «Картинки»";
+        tab.click();
+        await wait(300);
+        byText(".ws-side .ws-gen", "Свой промпт")?.click();
+        await wait(150);
+        type(document.querySelector(".ig-phrase input"), "кот");
+        await wait(50);
+        type(document.querySelector(".ig-prompt textarea"), "a fat кот sitting on a golden throne made of fish");
+        await wait(100);
+        const save = byText(".ig-preset-tools button", "Сохранить как пресет");
+        if (!save) return "нет «Сохранить как пресет»";
+        save.click();
+        await wait(200);
+        return document.querySelector(".pe textarea")?.value ?? "редактор не открылся";
+      `);
+      steps.шаблон = opened;
+      if (opened !== "a fat {фраза} sitting on a golden throne made of fish") return fail(`шаблон: ${opened}`);
+      await shot("1-шаблон");
+      steps.сохранён = await js(`
+        type(document.querySelector(".pe input"), "Тест-пресет");
+        await wait(50);
+        byText(".pe-bar button", "Сохранить")?.click();
+        await wait(400);
+        const own = document.querySelector(".ws-gen.own.sel");
+        if (!own) return "в колонке нет выбранного своего пресета";
+        type(document.querySelector(".ig-phrase input"), "пёс");
+        await wait(50);
+        byText(".ig-prompt button", "Другая сцена")?.click();
+        for (let i = 0; i < 30 && !document.querySelector(".ig-prompt textarea").value; i++) await wait(100);
+        return own.textContent + " → " + document.querySelector(".ig-prompt textarea").value;
+      `);
+      if (!/Тест-пресет.*a fat пёс sitting on a golden throne made of fish No text/.test(String(steps.сохранён))) return fail("подстановка фразы");
+      await shot("2-пресет");
+      steps.инструкция = await js(`
+        byText(".ig-preset-tools button", "Настроить")?.click();
+        await wait(200);
+        byText(".pe button", "Сделать инструкцией")?.click();
+        await wait(150);
+        const d = document.querySelector(".pe-final");
+        if (d) d.open = true;
+        await wait(100);
+        return document.querySelector(".pe-final pre")?.textContent ?? "нет итоговой инструкции";
+      `);
+      if (!String(steps.инструкция).includes("«кот» → a fat кот sitting")) return fail("инструкция из шаблона");
+      await shot("3-инструкция");
+      steps.удалён = await js(`
+        byText(".pe-bar button", "Отмена")?.click();
+        await wait(150);
+        byText(".ig-preset-tools button", "Настроить")?.click();
+        await wait(200);
+        byText(".pe-bar button", "Удалить пресет")?.click();
+        await wait(100);
+        byText(".pe-bar button", "Да, удалить")?.click();
+        await wait(400);
+        return !document.querySelector(".ws-gen.own");
+      `);
+      if (steps.удалён !== true) return fail("пресет не удалился");
+      steps.встроенный = await js(`
+        byText(".ws-side .ws-gen", "детскому")?.click();
+        await wait(150);
+        byText(".ig-preset-tools button", "Настроить")?.click();
+        await wait(200);
+        return document.querySelectorAll(".pe-pair").length;
+      `);
+      await shot("4-встроенный");
+      return true;
+    })();
+    console.log("САМОПРОВЕРКА своих пресетов:", JSON.stringify({ ok, ...steps }, null, 1));
+    if (!ok) process.exitCode = 1;
+  }
+
+  // Подсказки фильмов (Wikidata): набрать начало названия, снять список, выбрать первый с клавиатуры.
+  if (data && arg("works-test")) {
+    const open = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      let btn = null;
+      for (let i = 0; i < 60 && !btn; i++) { await wait(100); btn = document.querySelector(".tb-studio") ?? byText(".file-actions button", "Студия"); }
+      if (!btn) return { ok: false, why: "нет кнопки «Студия» в шапке" };
+      btn.click();
+      let tab = null;
+      for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
+      if (!tab) return { ok: false, why: "нет вкладки «Картинки»" };
+      tab.click();
+      await wait(300);
+      const other = ${JSON.stringify(arg("works-preset") ?? "")};
+      byText(".ws-side .ws-gen", other || "детскому")?.click();
+      await wait(150);
+      const field = document.querySelector(".ig-phrase input");
+      if (!field) return { ok: false, why: "нет поля фразы" };
+      // другой стиль — только снимок строки с полем (подсказок там нет)
+      if (other) {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, ${JSON.stringify(arg("works-query") ?? "")});
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        await wait(300);
+        const r = (el) => el && el.getBoundingClientRect();
+        const [a, b] = [r(field), r(byText(".ws-params button", "Словарь"))];
+        return { ok: true, only: true, поле: a && [a.top, a.bottom], словарь: b && [b.top, b.bottom] };
+      }
+      field.focus();
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(field, ${JSON.stringify(arg("works-query") ?? "Солнцестоя")});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      let items = [];
+      // первый запрос к Wikidata на холодную бывает небыстрым
+      const t0 = performance.now();
+      for (let i = 0; i < 250 && !items.length; i++) { await wait(100); items = [...document.querySelectorAll(".ig-works li")]; }
+      if (!items.length) {
+        const direct = await window.api.worksSearch(field.value).then((r) => r.length + " шт.", (e) => String(e.message));
+        return { ok: false, why: "подсказки не появились", фраза: field.value, стиль: document.querySelector(".ws-side .ws-gen.sel")?.textContent, напрямую: direct, фокус: document.activeElement === field };
+      }
+      return { ok: true, подсказки: items.map((li) => li.textContent), сек: Math.round(performance.now() - t0) / 1000 };
+    })()`);
+    if (open?.ok) await writeFile(arg("works-test")!, (await win.webContents.capturePage()).toPNG());
+    const picked = !open?.ok || open.only ? open : await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const field = document.querySelector(".ig-phrase input");
+      const key = (k) => field.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      key("ArrowDown"); await wait(80); key("Enter"); await wait(300);
+      return {
+        ok: !document.querySelector(".ig-works") && !!document.querySelector(".ig-chosen"),
+        подсказки: ${JSON.stringify(open?.подсказки ?? [])},
+        сек: ${JSON.stringify(open?.сек ?? null)},
+        фраза: field.value,
+        выбрано: document.querySelector(".ig-chosen")?.textContent,
+      };
+    })()`);
+    if (picked?.ok) await writeFile(arg("works-test")!.replace(/\.png$/i, "-выбран.png"), (await win.webContents.capturePage()).toPNG());
+    console.log("САМОПРОВЕРКА подсказок фильмов:", JSON.stringify(picked, null, 1));
+    if (!picked?.ok) process.exitCode = 1;
+  }
+
   // Генерация картинок: студия слов → «Картинки» → фраза → нарисовать по-настоящему → в вопрос.
   // Выбран второй вопрос первой темы (так ставит onSelfTestLoad): картинка и ответ должны лечь туда.
   const igPhrase = arg("imagegen-test");
@@ -2932,6 +3108,10 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       if (sel) sel.value = t;
     })()`);
   }
+  // --css=<файл>: подмешать предложение по оформлению (design/proposal.css) только на время снимка — «до/после»
+  // снимаются одной сборкой, styles.css не трогаем, пока автор не одобрит
+  const cssArg = arg("css");
+  if (shot && cssArg) await win.webContents.insertCSS(await readFile(cssArg, "utf8"));
   // --win-width=N: снимок при другой ширине окна (шапка в узком окне); minWidth на время снимаем
   const ww = Number(arg("win-width"));
   if (shot && ww) {
@@ -3165,7 +3345,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;

@@ -8,7 +8,8 @@ import type { Package, Theme } from "../core/siq/model";
 import type { DictStats } from "../core/words/dict";
 import type { GeneratorInfo } from "../core/words/generators/registry";
 import type { GeneratorArgs, PuzzleTheme, WordHit } from "../core/words/generators/types";
-import type { ImagePreset } from "../core/ai/imagePresets";
+import type { ImagePreset } from "../core/ai/presetText";
+import type { WorkHit } from "../core/ai/works";
 import type { QuotaInfo } from "../core/ai/quota";
 import type { PhraseSet } from "../core/words/phrases";
 import type { ProfileId, SystemReport } from "../core/system/probe";
@@ -53,7 +54,7 @@ export interface PhraseDictionary {
 import type { AiSettings, ProviderEdit, ProviderTemplate } from "../core/ai/settings";
 
 export type { DictStats, GeneratorArgs, GeneratorInfo, PuzzleTheme, WordHit };
-export type { AiSettings, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo };
+export type { AiSettings, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo, WorkHit };
 
 /** Бесплатные модели не справились, платные есть — окно спрашивает автора. */
 export interface NeedPaid {
@@ -313,13 +314,22 @@ export interface Api {
   imagePresets(): Promise<ImagePreset[]>;
   /** Словарь фразеологизмов и пословиц (скачан заранее, из сети не читается). */
   phrases(): Promise<PhraseDictionary>;
-  /** Сохранить инструкцию стиля; null — вернуть исходную. Ответ — стили заново. */
-  imagePresetSave(id: string, text: string | null): Promise<ImagePreset[]>;
-  /** Фраза → промпт для рисования (у «своего промпта» — фраза как есть). */
-  /** temperature — насколько смело модель придумывает сцену (0 — предсказуемо, 1.5 — безумно). */
-  imagePrompt(phrase: string, preset: string, temperature?: number): Promise<{ text: string; model: string; skipped: string[] }>;
+  /** Сохранить пресет (встроенный — правкой поверх исходного). Ответ — пресеты заново. */
+  imagePresetPut(p: ImagePreset): Promise<ImagePreset[]>;
+  /** Удалить свой пресет; у встроенного — вернуть исходный. */
+  imagePresetDelete(id: string): Promise<ImagePreset[]>;
+  /**
+   * Фраза → промпт для рисования (шаблон — подстановка, без модели).
+   * temperature — насколько смело модель придумывает сцену (0 — предсказуемо, 1.5 — безумно);
+   * work — фильм, выбранный из списка Wikidata: модель не угадывает его, а получает готовым.
+   * В ответе work — какое произведение узнала модель, если она его назвала.
+   */
+  imagePrompt(phrase: string, preset: string, temperature?: number, work?: WorkHit): Promise<{ text: string; model: string; skipped: string[]; work?: string }>;
+  /** Фильмы, мультфильмы, сериалы и книги по началу русского названия (Wikidata). */
+  worksSearch(query: string): Promise<WorkHit[]>;
   /** style — id из imageStyles.ts: его английское описание дописывается к сцене. */
-  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string): Promise<GeneratedImage | NeedPaid>;
+  /** ownStyle — свой английский текст стиля пресета: дописывается вместо стиля с галочки. */
+  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string, ownStyle?: string): Promise<GeneratedImage | NeedPaid>;
   imageStyles(): Promise<ImageStyleInfo[]>;
   /** Картинку от ИИ — оригиналом в библиотеку (с моделью, стилем и сценой) и копией в пак. */
   imageKeep(dataUrl: string, phrase: string, info: { model: string; style?: string; prompt: string }): Promise<MediaInfo>;
