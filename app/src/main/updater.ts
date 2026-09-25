@@ -1,14 +1,11 @@
 // ---------- обновления ----------
-// Автообновление с собственного сервера автора (generic-провайдер electron-updater).
+// Автообновление из GitHub Releases (github-провайдер electron-updater, HTTPS): к релизу прикладываются
+// установщик, .blockmap и beta.yml / latest.yml, electron-updater сверяет sha512 каждого файла.
+// Пока версия с «-beta», берём и пре-релизы.
 //
-// Никакой тихой установки: однажды тихое обновление закрыло открытую Мастерскую автора
-// с несохранённой работой (см. AGENTS.md, раздел «Установщик (NSIS)»). Поэтому скачивание
-// и установка идут только по явной кнопке в UpdateBanner, а install ещё и спрашивает
-// про несохранённые правки — тем же диалогом, что и обычное закрытие окна.
-//
-// Адрес обновлений — обычный HTTP без подписи (бета на 1–2 пользователей, сервер ещё поднимается).
-// electron-updater всё равно сверяет sha512 каждого файла из latest.yml — подмена по дороге не пройдёт
-// незаметно, но перехват самого канала (MITM) этим не закрыт.
+// Никакой тихой установки: однажды тихое обновление закрыло открытую мастерскую автора
+// с несохранённой работой. Поэтому скачивание и установка идут только по явной кнопке в UpdateBanner,
+// а install ещё и спрашивает про несохранённые правки — тем же диалогом, что и обычное закрытие окна.
 
 import { app, ipcMain, type BrowserWindow } from "electron";
 import { autoUpdater, type UpdateInfo } from "electron-updater";
@@ -52,6 +49,7 @@ async function install(): Promise<void> {
 }
 
 if (active) {
+  autoUpdater.allowPrerelease = app.getVersion().includes("-");
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.on("checking-for-update", () => send({ state: "checking" }));

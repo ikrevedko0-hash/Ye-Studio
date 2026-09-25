@@ -79,7 +79,7 @@ npm run dist:update  # установщик в app/dist-setup
 
 На сервер автора (`server/`) уходят только: анонимный ID установки и версия (статистика запусков), отчёты об ошибках
 (без путей и имени пользователя; выключаются в «⚙ ИИ → Прочее») и отзывы, которые вы отправили сами.
-Выключения приложения по команде нет. Обновления приходят с того же сервера и ставятся только с вашего согласия.
+Обновления приходят из [релизов этого репозитория](../../releases) и ставятся только с вашего согласия.
 
 ## Спасибо
 
@@ -89,6 +89,8 @@ npm run dist:update  # установщик в app/dist-setup
 - [FirePacks](https://firepacks.net/) — пороги доли спецвопросов.
 - [LosslessCut](https://github.com/mifi/lossless-cut) — идеи для обрезки видео.
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp), [ffmpeg](https://ffmpeg.org/), [stable-diffusion.cpp](https://github.com/leejet/stable-diffusion.cpp).
+- [bgutil-ytdlp-pot-provider](https://github.com/Brainicism/bgutil-ytdlp-pot-provider) (Brainicism, GPL-3.0) — лежит
+  в `app/tools/pot-provider`, помогает yt-dlp с YouTube.
 
 ## Лицензия
 

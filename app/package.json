@@ -1,7 +1,7 @@
 {
   "name": "siq-workshop",
   "productName": "Ye!Studio",
-  "version": "0.2.0-beta.2",
+  "version": "0.2.0-beta.3",
   "private": true,
   "description": "Ye!Studio для «Своей игры»: планирование, медиа, сборка .siq",
   "license": "GPL-3.0-or-later",
@@ -59,8 +59,10 @@
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "http://193.233.112.48:8787/updates/"
+        "provider": "github",
+        "owner": "ikrevedko0-hash",
+        "repo": "Ye-Studio",
+        "releaseType": "prerelease"
       }
     ],
     "files": [
