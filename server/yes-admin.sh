@@ -20,6 +20,7 @@ usage() {
   reviews export <пак>      выгрузка отзывов на пак (JSON)
   reviews hide <пак> <ник>  убрать ник с доски дайверов
   reviews token             ключ выгрузки для «скачать отзывы игроков.py»
+  reviews auto [N]          автопубликация новых Уе!паков: что выложено и N строк журнала
 EOF
 }
 
@@ -88,6 +89,12 @@ for k, v in sorted(data.items(), key=lambda kv: kv[1].get("last", "")):
     ;;
   reviews)
     [[ $# -eq 0 ]] && set -- summary
+    if [[ "$1" == "auto" ]]; then
+      cat "${DATA_DIR}/reviews/autopublish.json" 2>/dev/null || echo "автопубликация ещё ничего не выкладывала"
+      echo; journalctl -u yestudio-reviews --no-pager -n "${2:-20}" 2>/dev/null || true
+      systemctl list-timers yestudio-reviews.timer --no-pager 2>/dev/null | head -3 || true
+      exit 0
+    fi
     if [[ "$(id -un)" == "${APP_USER}" ]]; then
       YES_DATA="${DATA_DIR}" python3 /opt/yestudio/reviews/reviews.py "$@"
     else

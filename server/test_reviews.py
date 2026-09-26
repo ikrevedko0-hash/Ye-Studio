@@ -101,5 +101,18 @@ class StoreTest(unittest.TestCase):
             self.assertIsNone(self.s.pack_file("9", name))
 
 
+class AutopublishTest(unittest.TestCase):
+    def test_candidates_only_authors_numbered_packs(self):
+        import autopublish
+        packs = [
+            {"id": 1, "name": "Уе!пак №11", "authors": ["Борис Бритва"]},
+            {"id": 2, "name": "Уе!пак №12", "authors": ["Кто-то другой"]},            # чужой — мимо
+            {"id": 3, "name": "Уе! пак № 7 (ремастер)", "authors": ["Борис Бритва"]},
+            {"id": 4, "name": "Ночные посиделки №85", "authors": ["Борис Бритва"]},    # не Уе!пак — мимо
+            {"id": 5, "name": "Мой Уе!пак №3", "authors": ["Борис Бритва"]},          # не с начала — мимо
+        ]
+        self.assertEqual([(s, p["id"]) for s, p in autopublish.candidates(packs)], [("11", 1), ("7", 3)])
+
+
 if __name__ == "__main__":
     unittest.main()

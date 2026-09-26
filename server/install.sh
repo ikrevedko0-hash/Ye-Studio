@@ -64,7 +64,9 @@ mkdir -p "${APP_DIR}/packindex" "${DATA_DIR}/packindex"
 cp -f "${SCRIPT_DIR}"/packindex/*.py "${APP_DIR}/packindex/"
 # отзывы игроков: код и страница — в APP_DIR, манифесты паков и ответы — в данных
 mkdir -p "${APP_DIR}/reviews/web" "${DATA_DIR}/reviews/packs"
-cp -f "${SCRIPT_DIR}"/reviews/reviews.py "${APP_DIR}/reviews/"
+cp -f "${SCRIPT_DIR}"/reviews/reviews.py "${SCRIPT_DIR}"/reviews/build_manifest.py "${SCRIPT_DIR}"/reviews/autopublish.py "${APP_DIR}/reviews/"
+# Pillow для миниатюр новых паков — в свою папку, системные пакеты не трогаем
+[[ -d "${APP_DIR}/vendor/PIL" ]] || python3 -m pip install --quiet --only-binary=:all: --target "${APP_DIR}/vendor" Pillow || echo "ПРЕДУПРЕЖДЕНИЕ: Pillow не поставился — новые паки будут без миниатюр"
 cp -f "${SCRIPT_DIR}"/reviews/web/* "${APP_DIR}/reviews/web/"
 
 if [[ ! -f "${DATA_DIR}/control.json" ]]; then
@@ -84,10 +86,12 @@ chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 cp -f "${SCRIPT_DIR}/yestudio.service" "/etc/systemd/system/${UNIT_NAME}"
 
 cp -f "${SCRIPT_DIR}/yestudio-packindex.service" "${SCRIPT_DIR}/yestudio-packindex.timer" /etc/systemd/system/
+cp -f "${SCRIPT_DIR}/yestudio-reviews.service" "${SCRIPT_DIR}/yestudio-reviews.timer" /etc/systemd/system/
 
 systemctl daemon-reload
 systemctl enable --now "${UNIT_NAME}"
 systemctl enable --now yestudio-packindex.timer
+systemctl enable --now yestudio-reviews.timer
 
 echo "== Проверка сервиса =="
 sleep 1

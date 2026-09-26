@@ -1,0 +1,24 @@
+[Unit]
+Description=Ye!Studio: новые Уе!паки с FirePacks — на страницу отзывов (уепак.рф)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=yestudio
+Group=yestudio
+WorkingDirectory=/opt/yestudio
+Environment=YES_DATA=/opt/yestudio/data
+ExecStart=/usr/bin/python3 /opt/yestudio/reviews/autopublish.py
+TimeoutStartSec=30min
+
+# Фоном и в своих рамках: рядом VPN, сайт и сервис yestudio.
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=50%
+MemoryMax=400M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/yestudio/data
+PrivateTmp=yes
