@@ -3,6 +3,7 @@ import { SPECIAL_TYPES } from "../../core/siq/helpers";
 import type { Package } from "../../core/siq/model";
 import { parseProposals, planInsert, type PlanRow, type RowMedia } from "../../core/siq/proposals";
 import type { MediaInfo, MediaResult } from "../../shared/api";
+import { Icon } from "./Icon";
 
 // «Вставить из AI»: блок json из чата → план «куда встанет» → вставка в открытый пак.
 // Картинки ищем в Яндекс.Картинках по запросу, который написал Claude: первая находка выбрана,
@@ -136,7 +137,7 @@ export function ProposalsPaste({ pkg, onClose, onInsert }: {
     const idx = pick[k] ?? 0;
     return (
       <div className="prp-thumbs">
-        <span className="muted" title="Запрос в Яндекс.Картинки">{side === "question" ? "🖼" : "🖼 ответ"}: {query}</span>
+        <span className="muted" title="Запрос в Яндекс.Картинки"><Icon name="image" size={13} />{side === "question" ? "" : " ответ"}: {query}</span>
         {list === "ищу" && <span className="muted">ищу…</span>}
         {typeof list === "string" && list !== "ищу" && <span className="prp-warn">{list} — вставлю пометку «найти»</span>}
         {Array.isArray(list) && (
@@ -160,7 +161,7 @@ export function ProposalsPaste({ pkg, onClose, onInsert }: {
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="proposals-paste">
         <header>
-          <b>📋 Вопросы от AI</b>
+          <b><Icon name="paste" />Вопросы от AI</b>
           <span className="spacer" />
           <button className="small" disabled={!!busy} onClick={() => void window.api.clipboardText().then(setText)}>Взять из буфера ещё раз</button>
           <button className="icon" onClick={onClose} disabled={!!busy} title="Закрыть">×</button>

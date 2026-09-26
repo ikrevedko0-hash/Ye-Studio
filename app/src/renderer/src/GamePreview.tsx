@@ -3,6 +3,7 @@ import { answerItems, contentGroups, findParam, GAME_TIME, getOptions, isPointQu
 import { fractionIn, useFitBox } from "./fitBox";
 import type { ContentItem, Question } from "../../core/siq/model";
 import type { MediaInfo } from "../../shared/api";
+import { Icon } from "./Icon";
 
 // Проигрывание вопроса так, как его покажет SIGame: элементы, связанные «одновременно»
 // (waitForFinish="False"), выходят одним экраном и раскладываются сверху вниз в порядке пака;
@@ -228,7 +229,7 @@ export function GamePreview({ question, timeDefaults = false, theme, price, medi
           {live && shown?.items.map((it, i) => it.placement === "background" && url(it)
             ? <audio key={`${at}-${run}-bg${i}`} src={url(it)} autoPlay onEnded={() => mediaEnded(i)} onError={() => mediaEnded(i)} />
             : null)}
-          {shown?.items.some((it) => it.placement === "background") && live && <div className="gp-bg">🔊 фоновый звук</div>}
+          {shown?.items.some((it) => it.placement === "background") && live && <div className="gp-bg"><Icon name="audio" size={14} /> фоновый звук</div>}
           {shown?.items.filter((it) => it.placement === "replic").map((it, i) => <div className="gp-replic" key={i}>Ведущий: {it.value}</div>)}
           {step.kind === "button" && <div className="gp-button">{pointImg ? "Щёлкните по картинке!" : "Жмите кнопку!"} {fmt(Math.max(0, step.seconds - now))}</div>}
           {pointImg && shown?.part === "answer" && (

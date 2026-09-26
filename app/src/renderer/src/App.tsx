@@ -29,6 +29,7 @@ import { ThemeSwitch } from "./ThemeSwitch";
 import { ThemeTransfer } from "./ThemeTransfer";
 import { TopBar } from "./TopBar";
 import { UpdateBanner } from "./UpdateBanner"; // ---------- обновления ----------
+import { Icon } from "./Icon";
 
 export interface Selection {
   round: number;
@@ -492,8 +493,8 @@ export function App() {
         <div className="welcome-actions">
           <button className="primary" onClick={actions.newPack}>Новый пак</button>
           <button onClick={actions.open}>Открыть .siq</button>
-          <button onClick={actions.components} title="Проверка машины, ffmpeg, yt-dlp и локальная модель картинок">🧩 Компоненты</button>
-          <button onClick={actions.assistant} title="Писать вопросы с Claude или ChatGPT: разметка в браузере и вставка в пак">🤝 Помощник</button>
+          <button onClick={actions.components} title="Проверка машины, ffmpeg, yt-dlp и локальная модель картинок"><Icon name="puzzle" />Компоненты</button>
+          <button onClick={actions.assistant} title="Писать вопросы с Claude или ChatGPT: разметка в браузере и вставка в пак"><Icon name="helper" />Помощник</button>
         </div>
         {draft && (
           <div className="draft-banner">

@@ -6,6 +6,7 @@ import type { Slot } from "../../core/siq/board";
 import type { Question, Round } from "../../core/siq/model";
 import type { MediaInfo } from "../../shared/api";
 import type { Mutate, Selection } from "./App";
+import { Icon } from "./Icon";
 
 interface Props {
   round: Round;
@@ -312,13 +313,13 @@ export function Board({ round, roundIndex, selection, onSelect, mutate, onTransf
         {themes.some((t) => t.name.trim() && !hasEmoji(t.name)) && (
           <button className="add-theme" title="Каждой теме раунда без эмодзи — пара по смыслу названия: перед и после"
             onClick={() => mutate((p) => { for (const t of p.rounds![roundIndex].themes ?? []) t.name = decorateThemeName(t.name); })}>
-            ✨ Эмодзи всем темам
+            <Icon name="helper" />Эмодзи всем темам
           </button>
         )}
       </div>
       <p className="legend">
         Клетки можно перетаскивать — вопрос берёт цену нового места.{"  "}
-        <span className="dot ready" /> готово — есть вопрос и ответ <span className="dot draft" /> черновик <span className="dot empty" /> пусто
+        Полоска снизу: <span className="nowrap"><span className="dot draft" /> черновик</span> <span className="nowrap"><span className="dot empty" /> пусто</span> <span>у готовых полоски нет.</span>
         {"  "}▣ картинка ♪ звук ▶ видео
       </p>
     </section>

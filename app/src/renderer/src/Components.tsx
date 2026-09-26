@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { ComponentsState, InstallProgress } from "../../core/components/manifest";
 import type { FirstRunOptions, UpdateStatus } from "../../shared/api";
 import type { ProfileId, SystemReport } from "../../core/system/probe";
+import { Icon } from "./Icon";
 
 const plainError = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
 const gb = (bytes: number) => `${(bytes / 1073741824).toFixed(1).replace(".", ",")} ГБ`;
@@ -97,7 +98,7 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
     act(async () => {
       setProgress(null);
       return window.api.installModel(id);
-    }, "Модель скачана и подключена: она первая в очереди «🎨 Картинок». Первая картинка после запуска рисуется ~30 с, дальше ~15 с.");
+    }, "Модель скачана и подключена: она первая в очереди «Картинок». Первая картинка после запуска рисуется ~30 с, дальше ~15 с.");
 
   const checks = report?.profile.checks.filter((c) => c.profile.id !== "cloud") ?? [];
   const bytesOf = (id: ProfileId) => state?.profiles.find((p) => p.id === id)?.bytes ?? 0;
@@ -107,7 +108,7 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="components-panel">
         <header>
-          <b>⚙ Компоненты</b>
+          <b><Icon name="puzzle" />Компоненты</b>
           <span className="spacer" />
           <button className="small" disabled={busy} onClick={() => void refresh()}>Проверить заново</button>
           <button className="icon" onClick={onClose} title={installing ? "Закрыть — загрузка продолжится" : "Закрыть"}>×</button>
@@ -204,7 +205,7 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
           {report && report.profile.recommended === "cloud" && !state?.model && (
             <div className="muted">
               Своей модели этой машине не хватит — картинки будет рисовать облако. Бесплатный ключ Cloudflare
-              добавляется в «⚙ ИИ».
+              добавляется в «ИИ».
             </div>
           )}
 

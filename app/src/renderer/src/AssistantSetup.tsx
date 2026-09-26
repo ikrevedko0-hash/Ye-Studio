@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import type { AssistantKind, AssistantSetupResult, AssistantStatus } from "../../shared/api";
+import { Icon } from "./Icon";
 
 const plainError = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
 
@@ -42,7 +43,7 @@ export function AssistantSetup({ onClose, first }: { onClose(): void; first?: bo
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) later(); }}>
       <div className="components-panel assistant-panel">
         <header>
-          <b>🤝 Помощник для вопросов</b>
+          <b><Icon name="helper" />Помощник для вопросов</b>
           <span className="spacer" />
           <button className="icon" onClick={later} title="Закрыть">×</button>
         </header>
@@ -106,7 +107,7 @@ export function AssistantSetup({ onClose, first }: { onClose(): void; first?: bo
                 <b>Чат Claude Desktop или claude.ai:</b> Настройки → Возможности → Навыки → «Загрузить навык» →
                 выберите в рабочей папке файл <code>{done.skillZip?.split(/[\\/]/).pop()}</code>.
                 <div className="assistant-row">
-                  <button className="small" onClick={() => void window.api.assistantOpen("folder")}>📂 Открыть папку</button>
+                  <button className="small" onClick={() => void window.api.assistantOpen("folder")}><Icon name="folder" />Открыть папку</button>
                   <button className="small" onClick={() => void window.api.assistantOpen("claude-skills")}>Открыть настройки Claude</button>
                 </div>
               </li>
@@ -136,7 +137,7 @@ export function AssistantSetup({ onClose, first }: { onClose(): void; first?: bo
               <li>
                 В «Файлы проекта» перетащите всё из папки <code>{CHATGPT_LABEL}</code>, кроме инструкций.
                 <div className="assistant-row">
-                  <button className="small" onClick={() => void window.api.assistantOpen("chatgpt-dir")}>📂 Открыть папку</button>
+                  <button className="small" onClick={() => void window.api.assistantOpen("chatgpt-dir")}><Icon name="folder" />Открыть папку</button>
                 </div>
               </li>
               <li>
@@ -165,7 +166,7 @@ export function AssistantSetup({ onClose, first }: { onClose(): void; first?: bo
             </>
           )}
         </div>
-        {!done && first && <div className="muted cmp-note">Позже — кнопка 🤝 в шапке.</div>}
+        {!done && first && <div className="muted cmp-note">Позже — кнопка «Помощник» (искры) в шапке.</div>}
       </div>
     </div>
   );

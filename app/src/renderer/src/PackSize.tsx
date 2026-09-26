@@ -7,6 +7,7 @@ import type { MediaInfo, PackDTO } from "../../shared/api";
 import type { Mutate } from "./App";
 import { applyScale, dataUrlBytes, exportCanvas, loadPackImage, toCanvas } from "./imageCanvas";
 import { MediaEditor } from "./MediaEditor";
+import { Icon } from "./Icon";
 
 /** Картинки легче этого не трогаем: выигрыш копеечный. */
 const IMAGE_MIN_BYTES = 300 * 1024;
@@ -92,7 +93,7 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="pack-size">
         <header>
-          <b>📦 Объём пака</b>
+          <b><Icon name="box" />Объём пака</b>
           <span className={over ? "ps-over" : "muted"}>{fmt(total)} из {PACK_TARGET_MB} МБ</span>
           <span className="spacer" />
           <button className="icon" onClick={onClose} disabled={!!busy} title="Закрыть">×</button>
@@ -128,7 +129,7 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
           <div className="ps-list">
             {heavyAv.map((m) => (
               <div key={`${m.folder}/${m.name}`}>
-                <span>{m.folder === "Video" ? "🎬" : "🎵"} {m.name}</span>
+                <span><Icon name={m.folder === "Video" ? "video" : "audio"} size={14} /> {m.name}</span>
                 <b>{fmt(m.size)}</b>
                 <button className="small" disabled={!!busy} onClick={() => setCompressing(m)} title="Обрезать до нужного куска или сжать до заданного размера">Сжать…</button>
               </div>

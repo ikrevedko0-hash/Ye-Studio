@@ -12,6 +12,7 @@ import { answerDuration, appendMedia, defaultTimedIndex, questionDefaultSec, TIM
 import type { ContentItem, Param, Question } from "../../core/siq/model";
 import type { MediaInfo, PackDTO } from "../../shared/api";
 import type { Mutate, Selection } from "./App";
+import { Icon } from "./Icon";
 
 interface Props {
   pack: PackDTO;
@@ -159,7 +160,7 @@ function ContentList({ items, inAnswer = false, timed, media, onChange, onAddMed
           ? "Сейчас: на одном экране, сверху вниз в том же порядке, что здесь (текст под картинкой — поставьте его ниже стрелками). Нажмите — и игра покажет их по очереди"
           : "Сейчас: игра покажет по очереди, дождавшись конца верхнего. Нажмите — и они выйдут на один экран"}
       >
-        {on ? "🔗 одновременно" : "⇣ по очереди"}
+        {on ? "одновременно" : "по очереди"}
       </button>
     );
   };
@@ -178,8 +179,8 @@ function ContentList({ items, inAnswer = false, timed, media, onChange, onAddMed
       <div className="content-add">
         <button onClick={() => onChange([...items, { value: "" }])}>+ Текст</button>
         <button onClick={onAddMedia} title="Взять файл с диска через проводник">+ С диска…</button>
-        <button onClick={onLibrary} title="Взять из того, что уже скачано для этого пака: папка source рядом с паком">📚 Библиотека…</button>
-        <button onClick={onSearch} title="Найти картинку, звук или видео в интернете и скачать в пак">🌐 В интернете…</button>
+        <button onClick={onLibrary} title="Взять из того, что уже скачано для этого пака: папка source рядом с паком"><Icon name="library" />Библиотека…</button>
+        <button onClick={onSearch} title="Найти картинку, звук или видео в интернете и скачать в пак"><Icon name="globe" />В интернете…</button>
         <button onClick={onCollage}>+ Коллаж…</button>
       </div>
     </div>

@@ -6,6 +6,7 @@ import type { MediaInfo } from "../../shared/api";
 import { fractionIn, useFitBox } from "./fitBox";
 import { exportCanvas, loadPackImage } from "./imageCanvas";
 import { NUMBER_STYLES, numberFromName, renderLogoNumber, type NumberPlan } from "./logoDraw";
+import { Icon } from "./Icon";
 
 /** Превью считаем в уменьшенной копии: мозаика и пламя на полном логотипе 3000 px тормозили бы мышь. */
 const PREVIEW = 900;
@@ -93,7 +94,7 @@ export function LogoNumber({ media, packName, onClose, onDone }: {
                 <button key={s.id} className={plan.style === s.id ? "primary" : ""} onClick={() => patch({ style: s.id })}>{s.label}</button>
               ))}
             </div>
-            <button onClick={() => patch({ seed: Math.floor(Math.random() * 1e9) })} title="Другие треугольники, языки пламени, цвет неона">🎲 Перемешать</button>
+            <button onClick={() => patch({ seed: Math.floor(Math.random() * 1e9) })} title="Другие треугольники, языки пламени, цвет неона"><Icon name="shuffle" />Перемешать</button>
             <label>Размер
               <input type="range" min={3} max={60} value={Math.round(plan.size * 100)} onChange={(e) => patch({ size: Number(e.target.value) / 100 })} />
             </label>

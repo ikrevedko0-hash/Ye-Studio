@@ -153,7 +153,7 @@ export function AiSettings({ onClose }: Props) {
                   <button key={p.id} className={`ws-gen${sel === p.id ? " sel" : ""}${p.disabled ? " off" : ""}`} onClick={() => setSel(p.id)}>
                     <b>
                       <span className={`ai-dot ${q?.level ?? "unknown"}`} />
-                      {p.title}{p.paid ? " 💰" : ""}{p.disabled ? " (выкл.)" : ""}
+                      {p.title}{p.paid ? " ₽" : ""}{p.disabled ? " (выкл.)" : ""}
                     </b>
                     <span className="muted">{p.hasKey || p.key ? "" : "нет ключа · "}{q?.text ?? p.note ?? ""}</span>
                   </button>
@@ -259,7 +259,7 @@ export function AiSettings({ onClose }: Props) {
             />
             <Queue
               title="Картинки"
-              about="Платные (💰) пропускаются, пока вы не нажмёте «Нарисовать платной». Исчерпанный дневной лимит — сервис пропускается до сброса."
+              about="Платные (₽) пропускаются, пока вы не нажмёте «Нарисовать платной». Исчерпанный дневной лимит — сервис пропускается до сброса."
               list={s.imageChain} all={allImage}
               paid={new Set(s.providers.filter((p) => p.paid).map((p) => p.id))}
               onChange={(imageChain) => { setS({ ...s, imageChain }); setDirty(true); }}
@@ -310,7 +310,7 @@ function Queue({ title, about, list, all, paid, onChange }: {
       <ol>
         {list.map((r, i) => (
           <li key={r}>
-            <span className="ai-ref">{r}{paid?.has(r.slice(0, r.indexOf(":"))) ? " 💰" : ""}</span>
+            <span className="ai-ref">{r}{paid?.has(r.slice(0, r.indexOf(":"))) ? " ₽" : ""}</span>
             <button className="icon" disabled={i === 0} onClick={() => move(i, -1)} title="Выше">↑</button>
             <button className="icon" disabled={i === list.length - 1} onClick={() => move(i, 1)} title="Ниже">↓</button>
             <button className="icon" onClick={() => onChange(list.filter((x) => x !== r))} title="Убрать из очереди">✕</button>

@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-// Шрифты лежат внутри приложения: Inter — интерфейс, Rubik — цены и названия тем.
-import "@fontsource-variable/inter";
-import "@fontsource-variable/rubik";
+// Шрифты лежат внутри приложения: Golos Text — интерфейс, Onest — цены и названия тем.
+import "@fontsource-variable/golos-text";
+import "@fontsource-variable/onest";
 import { App } from "./App";
 import { applyTheme, savedTheme } from "./themes";
 import "./styles.css";

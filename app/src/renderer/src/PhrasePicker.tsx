@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { PhraseDictionary } from "../../shared/api";
+import { Icon } from "./Icon";
 
 interface Props {
   onPick(text: string): void;
@@ -63,7 +64,7 @@ export function PhrasePicker({ onPick, used }: Props) {
           <option value={3}>до 3 слов</option>
           <option value={5}>до 5 слов</option>
         </select>
-        <button className="small primary" onClick={random} disabled={!found.length} title="Случайная фраза из того, что осталось после фильтров">🎲 Случайная</button>
+        <button className="small primary" onClick={random} disabled={!found.length} title="Случайная фраза из того, что осталось после фильтров"><Icon name="shuffle" />Случайная</button>
       </div>
       <div className="pp-styles">
         {dict.styles.map((s) => (

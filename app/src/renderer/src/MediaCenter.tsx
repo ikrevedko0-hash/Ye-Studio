@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CookiesPanel } from "./CookiesPanel";
 import type { Diagnosis, FetchProgress, MediaInfo, MediaResult, MediaType, ProviderInfo } from "../../shared/api";
+import { Icon } from "./Icon";
 
 interface Props {
   /** Куда предлагать вставить найденное: подпись на главной кнопке. */
@@ -16,9 +17,9 @@ interface Props {
 }
 
 const TYPES: { id: MediaType; label: string }[] = [
-  { id: "image", label: "🖼 Картинки" },
-  { id: "audio", label: "🎵 Звук" },
-  { id: "video", label: "🎬 Видео" },
+  { id: "image", label: "Картинки" },
+  { id: "audio", label: "Звук" },
+  { id: "video", label: "Видео" },
 ];
 
 /** IPC оборачивает ошибку главного процесса в «Error invoking remote method…» — автору пака это лишнее. */
@@ -99,7 +100,7 @@ function Thumb({ r }: { r: MediaResult }) {
   const chain = [r.thumbUrl, r.previewUrl].filter(Boolean) as string[];
   const [step, setStep] = useState(0);
   useEffect(() => { setStep(0); }, [r.thumbUrl, r.previewUrl]);
-  if (step >= chain.length) return <span className="mc-noimg">{r.type === "audio" ? "🎵" : r.type === "video" ? "🎬" : "🖼"}</span>;
+  if (step >= chain.length) return <span className="mc-noimg"><Icon name={r.type === "audio" ? "audio" : r.type === "video" ? "video" : "image"} size={34} /></span>;
   return <img src={chain[step]} alt="" onError={() => setStep((n) => n + 1)} />;
 }
 
@@ -294,7 +295,7 @@ export function MediaCenter({ target, onClose, onAdded }: Props) {
         <div className="mc-search">
           <div className="mc-types">
             {TYPES.map((t) => (
-              <button key={t.id} className={t.id === type ? "primary" : ""} onClick={() => setType(t.id)}>{t.label}</button>
+              <button key={t.id} className={t.id === type ? "primary" : ""} onClick={() => setType(t.id)}><Icon name={t.id} />{t.label}</button>
             ))}
           </div>
           <input
@@ -338,7 +339,7 @@ export function MediaCenter({ target, onClose, onAdded }: Props) {
           <div className="mc-waiting">
             {waiting.map((w) => (
               <span key={w.id} className={`mc-src ${w.state === "ждём" ? "wait" : w.state === "отказ" ? "bad" : "ok"}`}>
-                {w.state === "ждём" ? "⏳" : w.state === "отказ" ? "✖" : "✔"} {w.title}
+                {w.state === "ждём" ? "…" : w.state === "отказ" ? "✖" : "✔"} {w.title}
                 {w.state === "готово" ? ` — ${w.count}${w.ms !== undefined ? `, ${(w.ms / 1000).toFixed(1)} с` : ""}` : ""}
                 {w.state === "отказ" ? " — не ответил" : ""}
               </span>

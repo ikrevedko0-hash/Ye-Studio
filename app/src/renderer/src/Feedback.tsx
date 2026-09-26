@@ -4,6 +4,7 @@
 // здесь только галочка, прикладывать его или нет. Текст при неудаче не теряется: можно поправить и повторить.
 
 import { useState } from "react";
+import { Icon } from "./Icon";
 
 interface Props {
   onClose(): void;
@@ -41,7 +42,7 @@ export function Feedback({ onClose }: Props) {
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="publish feedback">
         <header>
-          <b>💬 Обратная связь</b>
+          <b><Icon name="chat" />Обратная связь</b>
           <span className="spacer" />
           <button className="icon" onClick={onClose} title="Закрыть">×</button>
         </header>

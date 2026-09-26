@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MediaInfo, SourceMeta } from "../../shared/api";
+import { Icon } from "./Icon";
 
 interface Props {
   onClose(): void;
@@ -29,7 +30,7 @@ const KIND = (name: string): "image" | "audio" | "video" | "other" => {
   return "other";
 };
 
-const ICON = { image: "🖼", audio: "🎵", video: "🎬", other: "📄" };
+const ICON = { image: "image", audio: "audio", video: "video", other: "doc" } as const;
 
 /** Дата в человеческом виде: «сегодня, 14:05» понятнее полной ISO-строки. */
 function when(iso?: string): string {
@@ -127,7 +128,7 @@ export function MediaLibrary({ onClose, onAdded, target }: Props) {
                 <div className="mc-thumb">
                   {kind === "image"
                     ? <img src={libUrl(m.file)} alt="" width={160} height={90} loading="lazy" />
-                    : <span className="mc-noimg">{ICON[kind]}</span>}
+                    : <span className="mc-noimg"><Icon name={ICON[kind]} size={34} /></span>}
                 </div>
                 <div className="mc-title" title={m.file}>{m.title || m.file}</div>
                 <div className="mc-meta">

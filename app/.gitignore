@@ -18,3 +18,4 @@ resources/dict/
 resources/bin/
 dist-setup/
 dist-*/
+.design-out/

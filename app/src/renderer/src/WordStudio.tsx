@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import type { GeneratorArgs, GeneratorInfo, MediaInfo, PuzzleTheme, WordHit } from "../../shared/api";
 import { ImageStudio } from "./ImageStudio";
+import { Icon } from "./Icon";
 
 interface Props {
   onClose(): void;
@@ -100,8 +101,8 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
         <header>
           <b>Студия</b>
           <span className="ws-tabs">
-            <button className={tab === "words" ? "sel" : ""} onClick={() => setTab("words")}>🔤 Слова</button>
-            <button className={tab === "images" ? "sel" : ""} onClick={() => setTab("images")}>🎨 Картинки</button>
+            <button className={tab === "words" ? "sel" : ""} onClick={() => setTab("words")}><Icon name="text" />Слова</button>
+            <button className={tab === "images" ? "sel" : ""} onClick={() => setTab("images")}><Icon name="palette" />Картинки</button>
           </span>
           {tab === "words" && (
             <span className="muted">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { buildVkPost } from "../../core/siq/publish";
 import { getAttr } from "../../core/siq/model";
 import type { PackDTO } from "../../shared/api";
+import { Icon } from "./Icon";
 
 interface Props {
   pack: PackDTO;
@@ -54,7 +55,7 @@ export function Publish({ pack, onClose }: Props) {
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !drawing) onClose(); }}>
       <div className="publish">
         <header>
-          <b>📣 Публикация</b>
+          <b><Icon name="megaphone" />Публикация</b>
           <span className="spacer" />
           <button className="icon" onClick={onClose} disabled={drawing} title="Закрыть">×</button>
         </header>
@@ -66,13 +67,13 @@ export function Publish({ pack, onClose }: Props) {
         <p className="muted">Символов: {text.length}</p>
 
         <div className="buttons">
-          <button onClick={copyText}>📋 Скопировать текст</button>
+          <button onClick={copyText}><Icon name="paste" />Скопировать текст</button>
           <button onClick={() => void drawPoster()} disabled={drawing} title="Одна картинка со всеми раундами и темами пака">
-            🖼 Картинка со всеми темами
+            <Icon name="image" />Картинка со всеми темами
           </button>
           {posterPath && <button onClick={openFolder}>Открыть папку</button>}
           <button className="primary" onClick={() => void publishToVk()} title="Скопирует текст и откроет страницу ВК">
-            🚀 Опубликовать в ВК
+            Опубликовать в ВК
           </button>
         </div>
 

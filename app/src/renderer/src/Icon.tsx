@@ -21,6 +21,12 @@ const PATHS = {
   check: "M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6zM8.5 12l2.5 2.5 4.5-5",
   play: "M7 4.5v15l12-7.5z",
   history: "M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2",
+  image: "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 9h.01",
+  audio: "M9 18V6l10-2v12M9 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM19 16a2 2 0 1 1-4 0 2 2 0 0 1 4 0z",
+  video: "M4 6h11v12H4zM15 10l5-3v10l-5-3z",
+  shuffle: "M4 7h3l10 10h3M4 17h3l3-3M14 10l3-3h3M18 5l2 2-2 2M18 15l2 2-2 2",
+  text: "M5 7V5h14v2M12 5v14M9 19h6",
+  doc: "M6 3h8l4 4v14H6zM14 3v4h4",
 } as const;
 
 export type IconName = keyof typeof PATHS;

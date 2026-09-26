@@ -80,7 +80,7 @@ export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
             <p className="muted">Картинка на карточке пака в SIGame. Лучше квадратная.</p>
             <div className="buttons">
               <button onClick={uploadLogo}>Загрузить файл…</button>
-              {logoMedia && <button onClick={() => setNumbering(true)} title="Смешная цифра поверх логотипа — радуга-мозаика, огонь, неон, золото…">🔢 Номер на логотип…</button>}
+              {logoMedia && <button onClick={() => setNumbering(true)} title="Смешная цифра поверх логотипа — радуга-мозаика, огонь, неон, золото…">Номер на логотип…</button>}
               {logo && <button onClick={() => mutate((p) => setPackLogo(p, undefined))}>Убрать</button>}
             </div>
             {note && <p className="muted">{note}</p>}
@@ -153,7 +153,7 @@ export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
           <div className="wide">
             <button onClick={clearComments} disabled={!commentsCount}
               title={commentsCount ? undefined : "В паке нет комментариев"}>
-              🧹 Очистить все комментарии
+              Очистить все комментарии
             </button>
             {commentsNote && <p className="muted">{commentsNote}</p>}
           </div>
