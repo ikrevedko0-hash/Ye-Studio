@@ -65,6 +65,44 @@ async function api(url, body) {
   return r.json();
 }
 
+const plural = (n, one, few, many) => {
+  const m10 = n % 10, m100 = n % 100;
+  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+};
+const nQuestions = n => `${n} ${plural(n, "вопрос", "вопроса", "вопросов")}`;
+
+// случайность с зерном: у каждого игрока свой порядок, но после перезагрузки тот же
+function rng(seedStr) {
+  let h = 1779033703;
+  for (const ch of seedStr) h = Math.imul(h ^ ch.charCodeAt(0), 3432918353), h = (h << 13) | (h >>> 19);
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}
+
+// Бездна: вопросы вперемешку, дорогие (эмоциональные) — ближе к началу, одна тема подряд не идёт.
+// «Дороговизна» — место цены внутри своей темы: у раундов разные шкалы (700 / 1400 / 2100), в финале цен нет.
+function mixQuestions(M, seed) {
+  const rnd = rng(seed), items = [];
+  M.rounds.forEach(r => r.themes.forEach(t => {
+    const prices = t.questions.map(q => q.price), lo = Math.min(...prices), hi = Math.max(...prices);
+    t.questions.forEach(q => {
+      const rank = r.final ? 0.9 : hi > lo ? (q.price - lo) / (hi - lo) : 0.5;
+      items.push({ q, t, key: rank + rnd() * 0.45 });
+    });
+  }));
+  items.sort((x, y) => y.key - x.key);
+  const out = [];
+  while (items.length) {
+    const recent = out.slice(-2).map(x => x.t.id), last = recent[recent.length - 1];
+    let k = items.findIndex(x => !recent.includes(x.t.id));
+    if (k < 0) k = items.findIndex(x => x.t.id !== last);
+    out.push(items.splice(Math.max(k, 0), 1)[0]);
+  }
+  return out;
+}
+
 // ---------- эффекты ----------
 function toast(html, cls = "", ms = 2800) {
   const t = document.createElement("div");
@@ -115,7 +153,7 @@ async function home() {
     const { packs } = await api("/api/review/packs");
     $("#packs").innerHTML = packs.map((p, i) => `<a class="pk ${i === 0 ? "new" : ""}" href="/${esc(p.slug)}">
       ${p.logo ? `<img src="/p/${esc(p.slug)}/${esc(p.logo)}" alt="" loading="lazy">` : `<div class="nologo"></div>`}
-      <div><b>${esc(p.title)}</b><small>${esc(p.date)} · ${p.questions} вопросов · 🤿 ${p.divers}</small></div>
+      <div><b>${esc(p.title)}</b><small>${esc(p.date)} · ${nQuestions(p.questions)} · 🤿 ${p.divers}</small></div>
       <span class="go">›</span></a>`).join("") || `<div class="pk">Паков пока нет. Автор, видимо, ещё пишет.</div>`;
   } catch (e) {
     $("#packs").innerHTML = `<div class="pk">${esc(joke("misc", "offline"))}</div>`;
@@ -229,11 +267,11 @@ async function pack(slug) {
   const mediaIcons = q => (q.media || []).map(m => ({ image: "🖼", audio: "🎵", video: "🎬" }[m] || "")).join(" ");
   const a = S.answers;
 
-  const qCard = q => {
+  const qCard = (q, t) => {
     const v = a["q:" + q.id], r = v && v.r, why = (v && v.why) || [];
     return `<div class="q ${r ? "done r-" + r : ""}" data-q="${q.id}">
       ${q.thumb ? `<img class="q-img" src="${thumb(q)}" alt="" loading="lazy" decoding="async">` : `<div class="q-noimg">${mediaIcons(q) || "❓"}</div>`}
-      <div class="q-meta"><b>${q.price}</b><span>${mediaIcons(q)}</span>${q.type === "stake" ? "<span>🎰 аукцион</span>" : q.type === "secret" ? "<span>🐱 кот</span>" : ""}</div>
+      <div class="q-meta"><b>${q.price || "финал"}</b><span class="q-theme">${esc(t.name)}</span><span>${mediaIcons(q)}</span>${q.type === "stake" ? "<span>🎰 аукцион</span>" : q.type === "secret" ? "<span>🐱 кот</span>" : ""}</div>
       ${q.text ? `<div class="q-text">${esc(q.text)}</div>` : ""}
       <div class="q-ans">Ответ: <b>${esc(q.answer || "—")}</b></div>
       <div class="rx">${REACT.map(([id, e, l]) => `<button data-r="${id}" class="${r === id ? "on" : ""}" aria-label="${l}"><span>${e}</span>${l}</button>`).join("")}</div>
@@ -246,7 +284,7 @@ async function pack(slug) {
   $("#app").innerHTML = `
   <section class="lv lv-sky" id="lv0">
     <div class="sky-top"><a href="/">← все паки</a><div class="sun"></div></div>
-    <div class="pack-head">${logo}<div><h1>${esc(M.title)}</h1><div class="date">${esc(M.date)} · ${nQ} вопросов</div></div></div>
+    <div class="pack-head">${logo}<div><h1>${esc(M.title)}</h1><div class="date">${esc(M.date)} · ${nQuestions(nQ)}</div></div></div>
     ${tier("sky", "Уровень 0 · над водой")}
     <div class="rating">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button data-rate="${n}" class="${a.rating === n ? "on" : ""}">${n}</button>`).join("")}</div>
     <p class="say" id="say-rate"></p>
@@ -279,8 +317,8 @@ async function pack(slug) {
   </section>
   <section class="lv lv-4" id="lv4">
     ${tier("l4", "Уровень 4 · бездна")}
-    ${M.rounds.map(r => r.themes.map(t => `<div class="th-head"><span>${esc(t.name)}</span><small data-cnt="${t.id}"></small></div>
-      ${t.questions.map(qCard).join("")}`).join("")).join("")}
+    <p class="hint" id="abyss-cnt"></p>
+    ${mixQuestions(M, pid() + ":" + slug).map(x => qCard(x.q, x.t)).join("")}
   </section>
   <section class="lv lv-5" id="lv5">
     ${tier("l5", "Уровень 5 · дно")}
@@ -297,10 +335,8 @@ async function pack(slug) {
   updateCounts(); hud();
 
   function updateCounts() {
-    themes.forEach(t => {
-      const n = t.questions.filter(q => a["q:" + q.id]).length, el = $(`[data-cnt="${t.id}"]`);
-      if (el) el.textContent = `${n}/${t.questions.length}`;
-    });
+    const n = questions.filter(q => a["q:" + q.id]).length;
+    $("#abyss-cnt").textContent = n ? `Оценено ${n} из ${nQuestions(nQ)}` : `Здесь ${nQuestions(nQ)} вперемешку, самые дорогие — ближе к началу.`;
   }
 
   // --- события (делегирование: одна подписка на весь айсберг)
