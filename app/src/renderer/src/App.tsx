@@ -487,8 +487,7 @@ export function App() {
     return (
       <div className="welcome">
         <h1>
-          <span className="logo-ye">Ye!</span>Studio{" "}
-          <span className="beta-badge" title="Бета-тест: возможны ошибки. Сообщите о них через обратную связь">БЕТА</span>
+          <span className="logo-ye">Ye!</span>Studio
         </h1>
         <p>Планирование, медиа и сборка паков для «Своей игры».</p>
         <div className="welcome-actions">

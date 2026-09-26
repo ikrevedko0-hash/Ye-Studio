@@ -37,6 +37,7 @@ main { max-width:1100px; margin:0 auto; padding:18px 16px 80px; }
 .ab.e.on { background:var(--chip); }
 .tags { display:flex; gap:4px; flex-wrap:wrap; padding:0 12px 8px 88px; } .tags:empty { display:none; }
 .tag { font-size:12px; background:var(--warn); color:#fff; border-radius:999px; padding:1px 8px; } .tag.pf { background:var(--accent); } .tag.nt { background:var(--chip); color:var(--ink); }
+.tag.dup { background:var(--bad); } .tag.dup.soft { background:var(--warn); } .tag.dup a { color:#fff; text-decoration:underline; }
 .edit { border-top:1px dashed var(--line); padding:10px 12px 12px; display:grid; grid-template-columns:110px 1fr; gap:6px 10px; align-items:center; }
 .edit label { color:var(--muted); font-size:13px; }
 .f { width:100%; background:var(--bg); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:6px 9px; font:inherit; font-size:14px; }
@@ -105,12 +106,19 @@ function renderTabs() {
   $("themes").innerHTML = TH.map((t, i) => { const n = takenN(t);
     return `<button class="tb ${i === state.theme ? "on" : ""}" data-i="${i}">${esc(t.name)}<span class="c ${n === 7 ? "ok" : n > 7 ? "over" : ""}">${n}/7</span></button>`; }).join("");
 }
+// q.dup — пометка «проверить повторы.py»: где на FirePacks такое уже было (самые ранние паки первыми)
+const DUP = { exact:"🔁 дословно было", media:"🔁 тот же файл был", answer:"🔁 тот же ответ был" };
+function dupTag(q) {
+  const d = q.dup; if (!d || !d.where || !d.where.length) return "";
+  const w = d.where[0], more = d.total > 1 ? ` и ещё ${d.total - 1}` : "";
+  return `<span class="tag dup ${d.kind === "answer" ? "soft" : ""}">${DUP[d.kind] || "🔁 было"}: <a href="${esc(w.url)}" target="_blank" rel="noreferrer" onclick="event.stopPropagation()">«${esc(w.name)}»</a>${w.theme ? " / " + esc(w.theme) : ""}${w.price != null ? " / " + esc(w.price) : ""}${more}</span>`;
+}
 function rowHtml(q, i) {
   const l = q.isOwn ? { take:true, reasons:[], pf:"", note:"" } : lab(q.id);
   const img = val(q, "image"), txt = val(q, "text"), acc = (val(q, "accept") || []).join(", ");
   const cls = ["row", i === state.sel ? "sel" : "", l.take === true ? "take" : l.take === false ? "no" : ""].join(" ");
   const tags = l.reasons.map(r => `<span class="tag">${esc((REASONS.find(x => x[0] === r) || [r, r])[1])}</span>`).join("")
-    + (l.pf ? `<span class="tag pf">${esc(PFS.find(p => p[0] === l.pf)[1])}</span>` : "") + (l.note ? `<span class="tag nt">💬 ${esc(l.note)}</span>` : "") + (q.isOwn ? `<span class="tag nt">✍ своё</span>` : "") + (!q.isOwn && DATA.showNew && q.pre !== true ? `<span class="tag pf">новое</span>` : "");
+    + (l.pf ? `<span class="tag pf">${esc(PFS.find(p => p[0] === l.pf)[1])}</span>` : "") + (l.note ? `<span class="tag nt">💬 ${esc(l.note)}</span>` : "") + (q.isOwn ? `<span class="tag nt">✍ своё</span>` : "") + (!q.isOwn && DATA.showNew && q.pre !== true ? `<span class="tag pf">новое</span>` : "") + dupTag(q);
   let edit = "";
   if (state.open[q.id] && !q.isOwn) edit = `<div class="edit" data-q="${q.id}">
     <label>Цена</label><input class="f" data-k="price" type="number" step="100" style="width:110px" value="${esc(val(q,"price"))}">

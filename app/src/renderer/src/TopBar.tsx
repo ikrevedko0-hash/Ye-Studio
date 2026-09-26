@@ -82,7 +82,6 @@ export function TopBar({ pack, dirty, stats, status, mutate, actions }: Props) {
       <div className="topbar-row">
         <div className="topbar-brand" title="Ye!Studio — мастерская паков «Своя игра»">
           <span className="logo-word"><span className="logo-ye">Ye!</span><span className="logo-studio">Studio</span></span>
-          <span className="beta-badge" title="Бета-тест: возможны ошибки. Сообщите о них через обратную связь">БЕТА</span>
         </div>
         {/* группы переносятся на новую строку целиком, а не уезжают за край окна; в узком окне у второстепенных
             кнопок остаётся только значок (подпись — в подсказке) */}
