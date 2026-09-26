@@ -124,13 +124,16 @@ if (!verifyMeta(meta, PUBLIC_KEY)) fail("Подпись не сходится с
 writeFileSync(join(out, "code.json"), JSON.stringify(meta, null, 2) + "\n");
 console.log(`Код: ${(asar.length / 1048576).toFixed(1)} МБ, в архиве ${(gz.length / 1048576).toFixed(1)} МБ, подписан.`);
 
-// установщик — в каждом релизе (см. шапку)
-sh("npx electron-builder --win nsis --config.directories.output=dist-setup --publish never");
+// установщик — в каждом релизе (см. шапку). Старые yml из прошлых сборок убрать: иначе в релиз уедет
+// beta.yml прошлой версии (так было в v0.2.0 — пришлось перезаливать).
 const setup = join(root, "dist-setup");
+for (const f of ["beta.yml", "latest.yml"]) rmSync(join(setup, f), { force: true });
+sh("npx electron-builder --win nsis --config.directories.output=dist-setup --publish never");
 const exe = `Ye-Studio-Setup-${version}.exe`;
 if (!existsSync(join(setup, exe))) fail(`Не собрался ${exe}`);
 for (const f of [exe, `${exe}.blockmap`]) copyFileSync(join(setup, f), join(out, f));
 const yml = ["beta.yml", "latest.yml"].map((f) => join(setup, f)).find(existsSync) ?? fail("electron-builder не написал beta.yml / latest.yml");
+if (!readFileSync(yml, "utf8").startsWith(`version: ${version}\n`)) fail(`${yml} не для версии ${version}`);
 copyFileSync(yml, join(out, "beta.yml"));
 copyFileSync(yml, join(out, "latest.yml"));
 
