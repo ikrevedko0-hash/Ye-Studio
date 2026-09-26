@@ -57,6 +57,27 @@ journalctl -u yestudio -n 100
 - `POST /api/feedback` — JSON `{id, v, os, text, contact?, screenshot?, screenshotType?, log?}` → `{"ok": true}`
 - `GET/HEAD /updates/<file>` — раздача файлов из `data/updates/`, поддержка `Range`
 - `GET /health` — `ok`, без ключа
+- `GET /api/pack-index` → `{builtAt, packs, questions, normVersion}` — какая база повторов сейчас на сервере
+- `POST /api/pack-check` — JSON `{questions: [{text, answers: [...], media: ["crc32hex:размер", ...]}], exclude?: [id FirePacks]}`
+  → `{results: [{i, kind: exact|media|answer, total, where: [{pack, tq, price}]}], packs: {id: {name, url, date, authors}},
+  themes: {"id:t": [раунд, тема]}, summary: [{pack, exact, media, answer}], index}`. Лимиты: 3000 вопросов,
+  60 запросов в час с IP, 2 проверки одновременно. Текст вопросов не сохраняется и не пишется в лог.
+  Нет базы — 503.
+
+## База повторов паков (`packindex/`)
+
+Код: `packindex/update.py` (каталог FirePacks → content.xml новых паков кусками по Range → сжатый индекс
+из хешей), `packlib.py` (разбор, нормализация, проверка), `check.py` (проверка пака из командной строки).
+Данные: `/opt/yestudio/data/packindex/` (`index.sqlite` ~130 МБ, `data/` ~150 МБ, `logs/`, `last_run.json`).
+
+- Установка/обновление поверх работающего сервера: `sudo ./install-packindex.sh [база.tar.gz]` — код, таймер,
+  перезапуск `yestudio`. Архив с первой базой (с ПК: `index.sqlite` + `data/`) распаковывается в данные.
+- Таймер `yestudio-packindex.timer` — раз в сутки около 05:00: докачать новые паки и дописать индекс.
+  Работает фоном: `Nice=15`, `IOSchedulingClass=idle`, `CPUQuota=50%`, `MemoryMax=400M`. Индекс больше 1 ГБ
+  или меньше 512 МБ свободного места — останавливается, старый индекс не трогает.
+- Состояние: `yes-admin.sh packindex [N]` — итог последнего обновления и хвост журнала.
+  Вручную: `systemctl start yestudio-packindex` (второй запуск одновременно не начнётся).
+- Поменялись правила нормализации — поднять `NORM_VERSION` в `packlib.py`: индекс пересоберётся из `data/xml`.
 
 ## Локальный запуск для тестов (Windows/любая ОС)
 

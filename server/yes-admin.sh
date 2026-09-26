@@ -15,6 +15,7 @@ usage() {
   installs                  список установок и последний визит
   errors [N]                последние N строк ошибок (по умолчанию 20)
   feedback                  список папок с отзывами
+  packindex [N]             база повторов: итог последнего обновления и N строк его журнала
 EOF
 }
 
@@ -67,6 +68,19 @@ for k, v in sorted(data.items(), key=lambda kv: kv[1].get("last", "")):
     else
       echo "нет папки отзывов: ${dir}"
     fi
+    ;;
+  packindex)
+    n="${1:-30}"
+    pi="${DATA_DIR}/packindex"
+    if [[ -f "${pi}/last_run.json" ]]; then
+      cat "${pi}/last_run.json"; echo
+      log="$(ls -1t "${pi}"/logs/update-*.log 2>/dev/null | head -n1 || true)"
+      [[ -n "${log}" ]] && { echo "--- ${log}"; tail -n "${n}" "${log}"; }
+    else
+      echo "база ещё не обновлялась: нет ${pi}/last_run.json"
+    fi
+    ls -la "${pi}/index.sqlite" 2>/dev/null || true
+    systemctl list-timers yestudio-packindex.timer --no-pager 2>/dev/null | head -3 || true
     ;;
   *)
     usage

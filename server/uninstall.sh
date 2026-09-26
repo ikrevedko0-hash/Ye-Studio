@@ -20,6 +20,12 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+if systemctl list-unit-files yestudio-packindex.timer >/dev/null 2>&1; then
+  systemctl disable --now yestudio-packindex.timer 2>/dev/null || true
+  rm -f /etc/systemd/system/yestudio-packindex.timer /etc/systemd/system/yestudio-packindex.service
+  echo "таймер базы повторов удалён"
+fi
+
 if systemctl is-active --quiet "${UNIT_NAME}" 2>/dev/null; then
   systemctl stop "${UNIT_NAME}"
   echo "сервис остановлен"
@@ -35,6 +41,8 @@ if [[ -f "/etc/systemd/system/${UNIT_NAME}" ]]; then
   systemctl daemon-reload
   echo "юнит удалён"
 fi
+
+rm -rf "${APP_DIR}/packindex"
 
 if [[ -f "${APP_DIR}/yestudio_server.py" ]]; then
   rm -f "${APP_DIR}/yestudio_server.py"

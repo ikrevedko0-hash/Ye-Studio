@@ -60,6 +60,8 @@ mkdir -p "${DATA_DIR}/errors" "${DATA_DIR}/feedback" "${DATA_DIR}/updates"
 mkdir -p "${APP_DIR}"
 
 cp -f "${SCRIPT_DIR}/yestudio_server.py" "${APP_DIR}/yestudio_server.py"
+mkdir -p "${APP_DIR}/packindex" "${DATA_DIR}/packindex"
+cp -f "${SCRIPT_DIR}"/packindex/*.py "${APP_DIR}/packindex/"
 
 if [[ ! -f "${DATA_DIR}/control.json" ]]; then
   cat > "${DATA_DIR}/control.json" <<'JSON'
@@ -77,8 +79,11 @@ chown -R "${APP_USER}:${APP_USER}" "${APP_DIR}"
 
 cp -f "${SCRIPT_DIR}/yestudio.service" "/etc/systemd/system/${UNIT_NAME}"
 
+cp -f "${SCRIPT_DIR}/yestudio-packindex.service" "${SCRIPT_DIR}/yestudio-packindex.timer" /etc/systemd/system/
+
 systemctl daemon-reload
 systemctl enable --now "${UNIT_NAME}"
+systemctl enable --now yestudio-packindex.timer
 
 echo "== Проверка сервиса =="
 sleep 1

@@ -1,0 +1,25 @@
+[Unit]
+Description=Ye!Studio: обновление базы повторов паков (FirePacks)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=yestudio
+Group=yestudio
+WorkingDirectory=/opt/yestudio
+ExecStart=/usr/bin/python3 /opt/yestudio/packindex/update.py --data /opt/yestudio/data/packindex --quiet --cache-mb 96
+# 3 — «уже запущено» (ручной запуск идёт), это не ошибка
+SuccessExitStatus=3
+TimeoutStartSec=4h
+
+# Фоном и в своих рамках: рядом VPN, сайт и сервис yestudio.
+Nice=15
+IOSchedulingClass=idle
+CPUQuota=50%
+MemoryMax=400M
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/yestudio/data
+PrivateTmp=yes

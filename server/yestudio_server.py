@@ -8,6 +8,8 @@
   POST /api/errors
   POST /api/feedback
   GET/HEAD /updates/<file>
+  GET  /api/pack-index                          — дата и размер базы повторов
+  POST /api/pack-check                          — проверить вопросы пака по базе повторов (packindex/)
   GET  /health
 
 Запуск:
@@ -16,6 +18,7 @@
   YES_HOST (default 0.0.0.0)
   YES_PORT (default 8787)
   YES_DATA (default /opt/yestudio/data)
+  YES_PACKINDEX (default $YES_DATA/packindex/index.sqlite)
 """
 
 from __future__ import annotations
@@ -37,6 +40,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "packindex"))
+try:
+    import packlib  # база повторов: нормализация, хеши, проверка (server/packindex/packlib.py)
+except ImportError:  # сервер без packindex/ продолжает работать, проверка отвечает 503
+    packlib = None
+
 # ---------------------------------------------------------------------------
 # Конфигурация
 # ---------------------------------------------------------------------------
@@ -44,6 +53,7 @@ from urllib.parse import urlsplit, parse_qs
 HOST = os.environ.get("YES_HOST", "0.0.0.0")
 PORT = int(os.environ.get("YES_PORT", "8787"))
 DATA_DIR = os.environ.get("YES_DATA", "/opt/yestudio/data")
+PACKINDEX = os.environ.get("YES_PACKINDEX", os.path.join(DATA_DIR, "packindex", "index.sqlite"))
 
 API_KEY_HEADER = "X-YeStudio-Key"
 API_KEY_VALUE = "yes-beta-2026"
@@ -55,6 +65,8 @@ RATE_LIMITS = {
     "ping": (30, 3600),
     "errors": (30, 3600),
     "feedback": (5, 3600),
+    "packcheck": (60, 3600),    # проверка пака по кнопке: с запасом на правку и перепроверку
+    "packinfo": (120, 3600),
 }
 RATE_LIMIT_WINDOW_SEC = max(w for _, w in RATE_LIMITS.values())
 
@@ -62,6 +74,13 @@ MAX_TEXT_LEN = 10000
 MAX_MESSAGE_LEN = 2000
 MAX_STACK_LEN = 8000
 MAX_ITEMS = 500
+
+# /api/pack-check: пак «Своей игры» — сотни вопросов; больше 3000 — не пак, а попытка выкачать базу
+MAX_CHECK_QUESTIONS = 3000
+MAX_CHECK_TEXT = 4000
+MAX_CHECK_ANSWERS = 10
+MAX_CHECK_MEDIA = 20
+_check_slots = threading.BoundedSemaphore(2)  # не больше 2 проверок одновременно — рядом VPN и сайт
 
 CHUNK_SIZE = 256 * 1024  # 256 КБ при раздаче файлов обновлений
 
@@ -316,6 +335,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._handle_feedback()
                 return
 
+            if path == "/api/pack-index" and self.command == "GET":
+                self._require_key_and_rate("packinfo")
+                self._handle_pack_index()
+                return
+
+            if path == "/api/pack-check" and self.command == "POST":
+                self._require_key_and_rate("packcheck")
+                self._handle_pack_check()
+                return
+
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
         except ApiError as e:
             try:
@@ -439,6 +468,63 @@ class Handler(BaseHTTPRequestHandler):
                 log(f"WARN feedback screenshot decode failed: {e}")
 
         self._send_json(HTTPStatus.OK, {"ok": True})
+
+    # --- /api/pack-index, /api/pack-check ---------------------------------
+    # Текст вопросов приходит в теле и нигде не сохраняется и не пишется в лог (пак может быть неизданным).
+
+    def _open_packindex(self):
+        if packlib is None or not os.path.isfile(PACKINDEX):
+            raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "pack index not ready")
+        # Новое соединение на запрос: таймер подменяет файл целиком (os.replace), и следующий запрос
+        # сразу видит новую базу без перезапуска сервиса.
+        db = packlib.open_index(PACKINDEX, readonly=True, cache_mb=16)
+        if not packlib.index_compatible(db):
+            db.close()
+            raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "pack index not ready")
+        return db
+
+    def _handle_pack_index(self):
+        db = self._open_packindex()
+        try:
+            info = packlib.index_info(db)
+        finally:
+            db.close()
+        self._send_json(HTTPStatus.OK, info)
+
+    def _handle_pack_check(self):
+        body = self._read_json_body()
+        raw = body.get("questions")
+        if not isinstance(raw, list) or not raw:
+            raise ApiError(HTTPStatus.BAD_REQUEST, "questions required")
+        if len(raw) > MAX_CHECK_QUESTIONS:
+            raise ApiError(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "too many questions")
+        questions = []
+        for q in raw:
+            if not isinstance(q, dict):
+                q = {}
+            answers = q.get("answers") if isinstance(q.get("answers"), list) else []
+            media = q.get("media") if isinstance(q.get("media"), list) else []
+            questions.append({
+                "text": clamp_str(q.get("text"), MAX_CHECK_TEXT),
+                "answers": [clamp_str(a, 500) for a in answers[:MAX_CHECK_ANSWERS] if isinstance(a, str)],
+                "media": [m for m in media[:MAX_CHECK_MEDIA] if isinstance(m, str) and packlib and packlib.FP_RE.match(m)],
+            })
+        exclude = body.get("exclude") if isinstance(body.get("exclude"), list) else []
+        exclude = [x for x in exclude[:50] if isinstance(x, int) or (isinstance(x, str) and x.isdigit())]
+        if not _check_slots.acquire(timeout=20):
+            raise ApiError(HTTPStatus.SERVICE_UNAVAILABLE, "busy")
+        try:
+            db = self._open_packindex()
+            try:
+                t0 = time.time()
+                result = packlib.check(db, questions, exclude)
+                result["index"] = packlib.index_info(db)
+            finally:
+                db.close()
+        finally:
+            _check_slots.release()
+        log(f"pack-check: {len(questions)} вопросов, совпадений {len(result['results'])}, {int((time.time() - t0) * 1000)} мс")
+        self._send_json(HTTPStatus.OK, result)
 
     # --- /updates/<file> --------------------------------------------------
 
