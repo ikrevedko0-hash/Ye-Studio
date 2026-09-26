@@ -5,6 +5,7 @@
 // сплэш всё равно закрывается (не висеть вечно из-за зависшей загрузки).
 
 import { join } from "node:path";
+import { appVersion } from "./version";
 import { app, BrowserWindow } from "electron";
 
 const MIN_SHOW_MS = 1200;
@@ -39,7 +40,7 @@ export function showSplash(): BrowserWindow {
     if (splashWin === win) splashWin = null;
   });
 
-  void win.loadFile(join(resourcesDir(), "splash", "splash.html"), { query: { v: app.getVersion() } });
+  void win.loadFile(join(resourcesDir(), "splash", "splash.html"), { query: { v: appVersion() } });
 
   splashWin = win;
   shownAt = Date.now();

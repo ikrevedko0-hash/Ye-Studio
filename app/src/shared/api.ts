@@ -377,6 +377,10 @@ export type UpdateStateKind = "idle" | "checking" | "available" | "downloading" 
 
 export interface UpdateStatus {
   state: UpdateStateKind;
+  /** code — лёгкое обновление кода (перезапуск), installer — новая оболочка через установщик */
+  kind?: "code" | "installer";
+  /** размер скачивания, МБ (для обновления кода) */
+  sizeMb?: number;
   version?: string;
   percent?: number;
   notes?: string;

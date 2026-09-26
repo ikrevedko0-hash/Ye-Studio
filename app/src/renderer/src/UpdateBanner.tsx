@@ -1,5 +1,6 @@
 // ---------- обновления ----------
 // Ненавязчивая плашка (не модалка): доступно обновление → скачать → готово → перезапустить.
+// Обновление кода (kind: "code") — пара мегабайт и перезапуск; установщик — только при новой оболочке.
 // «Позже» просто прячет плашку до следующего запуска (state сбрасывается перезапуском окна).
 
 import { useEffect, useState } from "react";
@@ -24,7 +25,12 @@ export function UpdateBanner() {
     <div className="update-banner">
       {status.state === "available" && (
         <>
-          <span>Доступна версия {status.version}{status.notes ? ` — ${status.notes.split("\n")[0]}` : ""}</span>
+          <span>
+            Доступна версия {status.version}
+            {status.kind === "code" && status.sizeMb !== undefined ? ` (${String(status.sizeMb).replace(".", ",")} МБ)` : ""}
+            {status.kind === "installer" ? " — новая сборка, через установщик" : ""}
+            {status.notes ? ` — ${status.notes.split("\n")[0]}` : ""}
+          </span>
           <span className="spacer" />
           <button className="primary small" onClick={() => void window.api.updateDownload()}>Скачать</button>
           <button className="small" onClick={() => setDismissed(true)}>Позже</button>
@@ -39,9 +45,11 @@ export function UpdateBanner() {
       )}
       {status.state === "ready" && (
         <>
-          <span>Обновление {status.version} готово к установке</span>
+          <span>{status.kind === "code" ? `Версия ${status.version} скачана — применится после перезапуска` : `Обновление ${status.version} готово к установке`}</span>
           <span className="spacer" />
-          <button className="primary small" onClick={() => void window.api.updateInstall()}>Перезапустить и обновить</button>
+          <button className="primary small" onClick={() => void window.api.updateInstall()}>
+            {status.kind === "code" ? "Перезапустить" : "Перезапустить и обновить"}
+          </button>
           <button className="small" onClick={() => setDismissed(true)}>Позже</button>
         </>
       )}

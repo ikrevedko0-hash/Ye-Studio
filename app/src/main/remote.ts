@@ -14,6 +14,7 @@ import { app, dialog, type BrowserWindow, type NativeImage } from "electron";
 import { CLIENT_KEY, SERVER_URL } from "../shared/server";
 import type { FeedbackRequest } from "../shared/api";
 import type { ServerCheck } from "../core/siq/dupCheck";
+import { appVersion } from "./version";
 
 const TIMEOUT_MS = 8000;
 const MSG_MAX = 1000;
@@ -91,7 +92,7 @@ function headers(): Record<string, string> {
 /** «Я запущен»: ID установки и версия — сервер отмечает, когда установку видели последний раз. Нет сети — молчим. */
 export async function ping(): Promise<void> {
   const id = await installId();
-  const v = app.getVersion();
+  const v = appVersion();
   await withTimeout((signal) =>
     fetch(`${SERVER_URL}/api/ping?id=${encodeURIComponent(id)}&v=${encodeURIComponent(v)}`, { headers: headers(), signal }))
     .catch(() => {});
@@ -153,7 +154,7 @@ export async function sendErrors(): Promise<void> {
   if (!q.length) return;
   try {
     const id = await installId();
-    const body = JSON.stringify({ id, v: app.getVersion(), os: osString(), items: q });
+    const body = JSON.stringify({ id, v: appVersion(), os: osString(), items: q });
     const res = await withTimeout((signal) => fetch(`${SERVER_URL}/api/errors`, { method: "POST", headers: headers(), body, signal }));
     if (!res.ok) return;
     errQueue = [];
@@ -227,7 +228,7 @@ export async function sendFeedback(req: FeedbackRequest): Promise<{ ok: boolean;
   const log = req.includeLog ? await errorsTail(50) : undefined;
   const id = await installId();
   const body = JSON.stringify({
-    id, v: app.getVersion(), os: osString(),
+    id, v: appVersion(), os: osString(),
     text: req.text.slice(0, 4000),
     contact: req.contact?.slice(0, 300) || undefined,
     screenshot: shot?.data,

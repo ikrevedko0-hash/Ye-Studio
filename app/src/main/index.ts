@@ -18,7 +18,8 @@ import { loginSession, logout, openLoginWindow, probeLoginPage, refreshLoginCook
 import { prepareQuietSelfTest, SELF_TEST, showQuietly } from "./quietWindow";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
 import { findSigame, launchSigame } from "./sigame";
-import { initUpdater } from "./updater"; // ---------- обновления ----------
+import { cleanupCode, initUpdater } from "./updater";
+import { appVersion, boot } from "./version"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
 // ---------- связь с сервером автора: выключение по ID, отчёты об ошибках, обратная связь ----------
 import { captureFeedbackShot, initRemote, packDupCheck, queueError, sendFeedback } from "./remote";
@@ -530,6 +531,7 @@ async function confirmBeforeUpdate(): Promise<boolean> {
       return false;
     }
   }
+  closeConfirmed = true; // уже спросили — окно при перезапуске не должно спрашивать второй раз
   return true;
 }
 
@@ -3188,6 +3190,23 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     })()`);
     console.log("САМОПРОВЕРКА проверки пака:", JSON.stringify(r));
   }
+  // --update-test=1 (с YES_UPDATE_API на поддельный список релизов): какой код взял загрузчик; если плашка
+  // предложит обновление — «Скачать» и дождаться «Перезапустить» (сам перезапуск не нажимаем)
+  if (shot && arg("update-test")) {
+    const r = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const banner = () => document.querySelector(".update-banner")?.textContent ?? "";
+      const btn = (t) => [...document.querySelectorAll(".update-banner button")].find((b) => b.textContent.includes(t));
+      for (let i = 0; i < 20 && !btn("Скачать"); i++) await wait(500);
+      const offered = banner();
+      if (!btn("Скачать")) return { offered };
+      btn("Скачать").click();
+      for (let i = 0; i < 60 && !btn("Перезапустить"); i++) await wait(500);
+      return { offered, after: banner() };
+    })()`);
+    const b = boot();
+    console.log("САМОПРОВЕРКА обновления:", JSON.stringify({ code: b?.codeVersion, source: b?.source, shell: b?.shell, version: appVersion(), ...r }));
+  }
   const ew = Number(arg("editor-width"));
   if (shot && ew) {
     const r = await win.webContents.executeJavaScript(`(async () => {
@@ -3302,6 +3321,8 @@ app.whenReady().then(async () => {
   });
   // ---------- обновления ----------
   initUpdater(win, confirmBeforeUpdate);
+  // Окно загрузилось — версия кода рабочая: загрузчик больше не считает её упавшей, старые версии убираем.
+  win.webContents.once("did-finish-load", () => setTimeout(() => { boot()?.ok(); cleanupCode(); }, 5000));
   // ---------- связь с сервером автора ----------
   // Выключение и отчёты об ошибках стартуют после показа окна и не трогают самопроверки.
   if (!SELF_TEST) win.once("show", () => initRemote(win!));
