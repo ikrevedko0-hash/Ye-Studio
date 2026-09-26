@@ -19,4 +19,3 @@ resources/bin/
 dist-setup/
 dist-*/
 .design-out/
-bootstrap/builtin.json

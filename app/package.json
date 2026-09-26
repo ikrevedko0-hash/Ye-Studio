@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "roundtrip": "tsx scripts/roundtrip.ts",
-    "pack": "electron-vite build && tsx scripts/code-asar.ts && electron-builder --win dir",
+    "pack": "electron-vite build && electron-builder --win dir",
     "fetch-dict": "tsx scripts/fetch-dict.ts",
     "providers-test": "tsx scripts/providers-test.ts",
     "fetch-wordsets": "tsx scripts/fetch-wordsets.ts",
@@ -24,8 +24,8 @@
     "components-test": "tsx scripts/components-test.ts",
     "ytdlp-component-test": "tsx scripts/ytdlp-component-test.ts",
     "pot-build": "npm --prefix tools/pot-provider install --no-audit --no-fund && npm --prefix tools/pot-provider exec -- tsc && npm --prefix tools/pot-provider prune --omit=dev",
-    "setup": "electron-vite build && tsx scripts/code-asar.ts && electron-builder --win nsis --config.directories.output=dist-setup",
-    "dist:update": "electron-vite build && tsx scripts/code-asar.ts && electron-builder --win nsis --config.directories.output=dist-setup --publish never",
+    "setup": "electron-vite build && electron-builder --win nsis --config.directories.output=dist-setup",
+    "dist:update": "electron-vite build && electron-builder --win nsis --config.directories.output=dist-setup --publish never",
     "code-asar": "tsx scripts/code-asar.ts",
     "release": "tsx scripts/release.ts",
     "code": "tsx scripts/code-local.ts"
@@ -70,6 +70,7 @@
     ],
     "files": [
       "bootstrap/**/*",
+      "out/**/*",
       "package.json"
     ],
     "asar": true,
@@ -90,10 +91,6 @@
       "signAndEditExecutable": false
     },
     "extraResources": [
-      {
-        "from": "dist-code/code.asar",
-        "to": "code.asar"
-      },
       {
         "from": "resources",
         "to": ".",
