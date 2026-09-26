@@ -20,6 +20,7 @@ echo "== Код =="
 mkdir -p "${APP_DIR}/packindex" "${PI_DATA}"
 cp -f "${SCRIPT_DIR}"/packindex/*.py "${APP_DIR}/packindex/"
 cp -f "${SCRIPT_DIR}/yestudio_server.py" "${APP_DIR}/yestudio_server.py"
+install -m 755 "${SCRIPT_DIR}/yes-admin.sh" /usr/local/bin/yes-admin
 
 if [[ -n "${1:-}" ]]; then
   echo "== Первая база из ${1} =="
