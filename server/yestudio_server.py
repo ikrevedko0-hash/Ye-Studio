@@ -11,6 +11,12 @@
   GET  /api/pack-index                          — дата и размер базы повторов
   POST /api/pack-check                          — проверить вопросы пака по базе повторов (packindex/)
   GET  /health
+Отзывы игроков на Уе!паки (публичные, без ключа; reviews/):
+  GET  /  и  /<пак>                             — страница «айсберга» (reviews/web/)
+  GET  /s/<file>, /p/<пак>/<file>               — её скрипты и миниатюры вопросов
+  GET  /api/review/packs, /api/review/pack/<пак>, /api/review/board/<пак>
+  POST /api/review                              — порция ответов игрока
+  GET  /api/review/export/<пак>                 — выгрузка для автора (заголовок X-Review-Admin)
 
 Запуск:
   python3 yestudio_server.py
@@ -24,6 +30,7 @@
 from __future__ import annotations
 
 import base64
+import hmac
 import io
 import json
 import os
@@ -46,6 +53,13 @@ try:
 except ImportError:  # сервер без packindex/ продолжает работать, проверка отвечает 503
     packlib = None
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "reviews"))
+try:
+    import reviews  # отзывы игроков (server/reviews/reviews.py)
+except ImportError:
+    reviews = None
+REVIEWS_WEB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reviews", "web")
+
 # ---------------------------------------------------------------------------
 # Конфигурация
 # ---------------------------------------------------------------------------
@@ -67,6 +81,9 @@ RATE_LIMITS = {
     "feedback": (5, 3600),
     "packcheck": (60, 3600),    # проверка пака по кнопке: с запасом на правку и перепроверку
     "packinfo": (120, 3600),
+    # страница отзывов шлёт ответы порциями не чаще раза в 4 с; 900/ч — компания игроков за одним роутером
+    "review": (900, 3600),
+    "reviewread": (900, 3600),
 }
 RATE_LIMIT_WINDOW_SEC = max(w for _, w in RATE_LIMITS.values())
 
@@ -246,7 +263,12 @@ class Handler(BaseHTTPRequestHandler):
         log(f'{self.client_address[0]} "{self.command} {self.path}" {fmt % args}')
 
     def _client_ip(self) -> str:
-        return self.client_address[0]
+        # Страницу отзывов отдаёт nginx по домену: тогда настоящий адрес — в X-Real-IP.
+        # Верим заголовку, только если соединение пришло с этой же машины.
+        ip = self.client_address[0]
+        if ip in ("127.0.0.1", "::1"):
+            return (self.headers.get("X-Real-IP") or ip).strip()[:64]
+        return ip
 
     def _send_json(self, status: int, payload) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -343,6 +365,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/pack-check" and self.command == "POST":
                 self._require_key_and_rate("packcheck")
                 self._handle_pack_check()
+                return
+
+            if self._route_reviews(path):
                 return
 
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
@@ -526,6 +551,102 @@ class Handler(BaseHTTPRequestHandler):
         log(f"pack-check: {len(questions)} вопросов, совпадений {len(result['results'])}, {int((time.time() - t0) * 1000)} мс")
         self._send_json(HTTPStatus.OK, result)
 
+    # --- отзывы игроков ----------------------------------------------------
+
+    def _route_reviews(self, path: str) -> bool:
+        """True, если запрос про отзывы и уже обработан."""
+        if reviews is None:
+            return False
+        get = self.command in ("GET", "HEAD")
+        if get and (path == "/" or re.match(r"^/[a-z0-9-]{1,32}/?$", path)):
+            self._send_static(os.path.join(REVIEWS_WEB, "index.html"), no_cache=True)
+            return True
+        if get and path.startswith("/s/"):
+            name = path[3:]
+            if re.match(r"^[a-z0-9._-]{1,64}$", name) and not name.startswith("."):
+                self._send_static(os.path.join(REVIEWS_WEB, name))
+            else:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            return True
+        m = re.match(r"^/p/([^/]+)/([^/]+)$", path)
+        if get and m:
+            found = review_store().pack_file(m.group(1), m.group(2))
+            if found:
+                self._send_static(found, max_age=86400)
+            else:
+                self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            return True
+        if not path.startswith("/api/review"):
+            return False
+
+        store = review_store()
+        if path == "/api/review" and self.command == "POST":
+            if not rate_limit_ok(self._client_ip(), "review"):
+                raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "rate limit")
+            body = self._read_json_body()
+            if body.get("website"):  # поле-ловушка: человек его не видит, бот заполняет
+                self._send_json(HTTPStatus.OK, {"depth": 0, "deeperThan": 0, "divers": 0})
+                return True
+            try:
+                res = store.save(str(body.get("pack", "")), str(body.get("pid", "")), body.get("answers") or {},
+                                 body.get("nick"), body.get("score"), self._client_ip())
+            except reviews.Invalid as e:
+                raise ApiError(HTTPStatus.BAD_REQUEST, f"invalid: {e}")
+            self._send_json(HTTPStatus.OK, res)
+            return True
+        if not get:
+            return False
+        if not rate_limit_ok(self._client_ip(), "reviewread"):
+            raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "rate limit")
+        if path == "/api/review/packs":
+            self._send_json(HTTPStatus.OK, {"packs": store.packs()})
+            return True
+        m = re.match(r"^/api/review/(pack|board|export)/([^/]+)$", path)
+        if not m:
+            return False
+        kind, slug = m.groups()
+        got = store.manifest(slug)
+        if not got:
+            raise ApiError(HTTPStatus.NOT_FOUND, "no such pack")
+        if kind == "pack":
+            self._send_bytes(got[1], "application/json; charset=utf-8", max_age=300)
+        elif kind == "board":
+            self._send_json(HTTPStatus.OK, {"board": store.board(slug)})
+        else:
+            token = self.headers.get("X-Review-Admin") or ""
+            if not hmac.compare_digest(token.encode(), store.admin_token().encode()):
+                raise ApiError(HTTPStatus.FORBIDDEN, "forbidden")
+            self._send_json(HTTPStatus.OK, store.export(slug))
+        return True
+
+    STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
+                    ".css": "text/css; charset=utf-8", ".webp": "image/webp", ".png": "image/png",
+                    ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8",
+                    ".ico": "image/x-icon", ".webmanifest": "application/manifest+json"}
+
+    def _send_bytes(self, body: bytes, content_type: str, max_age: int = 0, no_cache: bool = False) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-cache" if no_cache else f"public, max-age={max_age}")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        if content_type.startswith("text/html"):
+            self.send_header("Content-Security-Policy",
+                             "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; "
+                             "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _send_static(self, path: str, max_age: int = 300, no_cache: bool = False) -> None:
+        ctype = self.STATIC_TYPES.get(os.path.splitext(path)[1].lower())
+        if not ctype or not os.path.isfile(path):
+            self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            return
+        with open(path, "rb") as f:
+            self._send_bytes(f.read(), ctype, max_age=max_age, no_cache=no_cache)
+
     # --- /updates/<file> --------------------------------------------------
 
     def _handle_updates(self, rel_name: str):
@@ -652,6 +773,18 @@ class Handler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
+
+_review_store = None
+_review_store_lock = threading.Lock()
+
+
+def review_store():
+    global _review_store
+    with _review_store_lock:
+        if _review_store is None:
+            _review_store = reviews.Store(DATA_DIR)
+        return _review_store
 
 
 class Server(ThreadingHTTPServer):

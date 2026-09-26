@@ -16,6 +16,10 @@ usage() {
   errors [N]                последние N строк ошибок (по умолчанию 20)
   feedback                  список папок с отзывами
   packindex [N]             база повторов: итог последнего обновления и N строк его журнала
+  reviews [summary [пак]]   отзывы игроков: сводка по пакам
+  reviews export <пак>      выгрузка отзывов на пак (JSON)
+  reviews hide <пак> <ник>  убрать ник с доски дайверов
+  reviews token             ключ выгрузки для «скачать отзывы игроков.py»
 EOF
 }
 
@@ -81,6 +85,14 @@ for k, v in sorted(data.items(), key=lambda kv: kv[1].get("last", "")):
     fi
     ls -la "${pi}/index.sqlite" 2>/dev/null || true
     systemctl list-timers yestudio-packindex.timer --no-pager 2>/dev/null | head -3 || true
+    ;;
+  reviews)
+    [[ $# -eq 0 ]] && set -- summary
+    if [[ "$(id -un)" == "${APP_USER}" ]]; then
+      YES_DATA="${DATA_DIR}" python3 /opt/yestudio/reviews/reviews.py "$@"
+    else
+      runuser -u "${APP_USER}" -- env YES_DATA="${DATA_DIR}" python3 /opt/yestudio/reviews/reviews.py "$@"
+    fi
     ;;
   *)
     usage

@@ -62,6 +62,10 @@ mkdir -p "${APP_DIR}"
 cp -f "${SCRIPT_DIR}/yestudio_server.py" "${APP_DIR}/yestudio_server.py"
 mkdir -p "${APP_DIR}/packindex" "${DATA_DIR}/packindex"
 cp -f "${SCRIPT_DIR}"/packindex/*.py "${APP_DIR}/packindex/"
+# отзывы игроков: код и страница — в APP_DIR, манифесты паков и ответы — в данных
+mkdir -p "${APP_DIR}/reviews/web" "${DATA_DIR}/reviews/packs"
+cp -f "${SCRIPT_DIR}"/reviews/reviews.py "${APP_DIR}/reviews/"
+cp -f "${SCRIPT_DIR}"/reviews/web/* "${APP_DIR}/reviews/web/"
 
 if [[ ! -f "${DATA_DIR}/control.json" ]]; then
   cat > "${DATA_DIR}/control.json" <<'JSON'

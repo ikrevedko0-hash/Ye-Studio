@@ -41,3 +41,5 @@ docs/PLAN-installer.md
 # база повторов паков: данные и индекс (код — server/packindex), промо-ролик — не выкладывается
 /база паков/
 /Ye-Studio-promo.mp4
+/server/reviews/packs/
+/.playwright-mcp/
