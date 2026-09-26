@@ -136,6 +136,7 @@ const api: Api = {
   reportError: (err) => ipcRenderer.invoke("errors:report", err),
   feedbackCapture: () => ipcRenderer.invoke("feedback:capture"),
   feedbackSend: (req) => ipcRenderer.invoke("feedback:send", req),
+  dupCheck: (pkg, exclude) => ipcRenderer.invoke("dup:check", pkg, exclude ?? []),
 };
 
 contextBridge.exposeInMainWorld("api", api);

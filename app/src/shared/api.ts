@@ -5,6 +5,7 @@ import type { ProviderInfo } from "../core/media/providers/registry";
 import type { DownloadWish, FetchProgress, MediaResult, MediaType, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import type { DiagStep, Diagnosis } from "../core/media/providers/youtube";
 import type { Package, Theme } from "../core/siq/model";
+import type { DupReport } from "../core/siq/dupCheck";
 import type { DictStats } from "../core/words/dict";
 import type { GeneratorInfo } from "../core/words/generators/registry";
 import type { GeneratorArgs, PuzzleTheme, WordHit } from "../core/words/generators/types";
@@ -366,6 +367,8 @@ export interface Api {
   /** Снимок окна для отзыва — снимается сразу по 💬, до открытия формы. */
   feedbackCapture(): Promise<void>;
   feedbackSend(req: FeedbackRequest): Promise<{ ok: boolean; message: string }>;
+  /** «Повторы на FirePacks»: сверить вопросы пака с базой на сервере. exclude — id паков FirePacks, которые не считать. */
+  dupCheck(pkg: Package, exclude?: number[]): Promise<{ ok: true; report: DupReport } | { ok: false; message: string }>;
 }
 
 // ---------- обновления ----------

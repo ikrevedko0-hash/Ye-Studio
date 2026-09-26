@@ -19,7 +19,7 @@ import { Publish } from "./Publish";
 import { RoundTabs } from "./RoundTabs";
 import { QuestionEditor } from "./QuestionEditor";
 import { PackSize } from "./PackSize";
-import { PackCheck } from "./PackCheck";
+import { PackCheck, type DupState } from "./PackCheck";
 import { WordStudio } from "./WordStudio";
 import { AiSettings } from "./AiSettings";
 import { Components } from "./Components";
@@ -59,6 +59,7 @@ export function App() {
   const [packSize, setPackSize] = useState(false);
   const [publish, setPublish] = useState(false);
   const [packCheck, setPackCheck] = useState(false);
+  const [dups, setDups] = useState<DupState>({ exclude: [] });
   /** несохранённый пак, оставшийся после сбоя, — предлагаем восстановить на заставке */
   const [draft, setDraft] = useState<DraftInfo | null>(null);
   useEffect(() => { void window.api.draftInfo().then(setDraft); }, []);
@@ -571,6 +572,8 @@ export function App() {
       {packCheck && (
         <PackCheck
           pack={pack}
+          dups={dups}
+          setDups={setDups}
           onClose={() => setPackCheck(false)}
           onPackSize={() => { setPackCheck(false); setPackSize(true); }}
           onSigame={() => { setPackCheck(false); void actions.openInSigame(); }}

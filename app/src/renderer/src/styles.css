@@ -948,6 +948,17 @@ label.secs input:disabled { opacity: .5; }
 .pack-check header, .pack-check footer { display: flex; align-items: center; gap: 10px; }
 .pc-bad { color: var(--danger); font-weight: 600; }
 .pc-ok { color: var(--ready); font-weight: 600; }
+.pc-warn-text { color: var(--draft); font-weight: 600; }
+.pc-note { color: var(--muted); font-size: 12px; }
+.pc-dups { flex: none; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.pc-dups > header { display: flex; align-items: center; gap: 10px; }
+.pc-dup-error { color: var(--danger); margin: 0; }
+.pc-similar { margin: 0; padding: 6px 8px; border-radius: 6px; background: var(--wash); }
+.pc-dup-list { max-height: 34vh; }
+.pc-dup-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pc-dup-where, .pc-dup-more { color: var(--muted); font-size: 12px; }
+.pc-dup-more { list-style: none; margin: 2px 0 0; padding: 0 0 0 10px; }
+.pc-dups a { color: var(--accent); }
 .pc-empty { color: var(--muted); margin: 8px 0; }
 .pc-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .pc-list li { display: flex; align-items: baseline; gap: 10px; padding: 5px 8px; border-radius: 6px; }

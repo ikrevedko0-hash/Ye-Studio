@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { app, dialog, type BrowserWindow, type NativeImage } from "electron";
 import { CLIENT_KEY, SERVER_URL } from "../shared/server";
 import type { FeedbackRequest } from "../shared/api";
+import type { ServerCheck } from "../core/siq/dupCheck";
 
 const TIMEOUT_MS = 8000;
 const MSG_MAX = 1000;
@@ -239,6 +240,28 @@ export async function sendFeedback(req: FeedbackRequest): Promise<{ ok: boolean;
     return { ok: true, message: "Спасибо! Отправлено" };
   } catch {
     return { ok: false, message: "Не получилось отправить: нет связи с сервером" };
+  }
+}
+
+// ---------- повторы на FirePacks ----------
+
+export type ServerDupResult = { ok: true; data: ServerCheck } | { ok: false; message: string };
+
+/** Сверить вопросы с базой повторов на сервере (server/packindex). Сервер текст не сохраняет и не пишет в лог. */
+export async function packDupCheck(
+  questions: { text: string; answers: string[]; media: string[] }[],
+  exclude: number[],
+): Promise<ServerDupResult> {
+  try {
+    const body = JSON.stringify({ questions, exclude });
+    const res = await withTimeout((signal) => fetch(`${SERVER_URL}/api/pack-check`, { method: "POST", headers: headers(), body, signal }), 30_000);
+    if (res.status === 503) return { ok: false, message: "База повторов на сервере ещё не готова — попробуйте позже" };
+    if (res.status === 429) return { ok: false, message: "Слишком много проверок подряд — попробуйте через час" };
+    if (res.status === 413) return { ok: false, message: "Пак слишком большой для проверки (больше 3000 вопросов)" };
+    if (!res.ok) return { ok: false, message: `Сервер проверки ответил ошибкой ${res.status}` };
+    return { ok: true, data: (await res.json()) as ServerCheck };
+  } catch {
+    return { ok: false, message: "Нет связи с сервером проверки" };
   }
 }
 

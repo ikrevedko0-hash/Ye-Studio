@@ -140,6 +140,10 @@ class Net:
                 out.say(f"  Мимо VPN через «{alias}»: адрес {ip}, роутер {gw}. VPN-адаптер: {self.vpn or 'не найден'}")
         elif bind and bind != "none":
             self.src = bind
+        # FirePacks (Cloudflare) — обычным маршрутом, то есть через VPN, если он включён: напрямую у российского
+        # провайдера большие ответы Cloudflare виснут (страница каталога — таймаут, проверено 2026-09-26).
+        # Мимо VPN ходим только к VK за файлами паков.
+        self.direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         handlers = [urllib.request.ProxyHandler({})]           # системные прокси не нужны: VPN обходим напрямую
         if self.src:
             src = (self.src, 0)
@@ -166,8 +170,10 @@ class Net:
         if rng: h["Range"] = rng
         for n in range(tries):
             if pace: self._pace()
+            host = (urllib.parse.urlsplit(url).hostname or "").lower()
+            op = self.direct if host == "firepacks.net" or host.endswith(".firepacks.net") else self.opener
             try:
-                with self.opener.open(urllib.request.Request(url, headers=h), timeout=60) as r:
+                with op.open(urllib.request.Request(url, headers=h), timeout=60) as r:
                     st, final, hd = r.status, r.geturl(), r.headers
                     ctype = (hd.get("Content-Type") or "").lower()
                     if rng and st != 206:
@@ -629,7 +635,7 @@ def main():
                                 "  Проверьте, что интернет есть без VPN (кабель/Wi-Fi), и запустите ещё раз.")
             try:
                 net.get(API.format(1).replace("pageSize=100", "pageSize=1"), pace=False)
-                out.say("  FirePacks отвечает.", "ok")
+                out.say("  FirePacks отвечает (к нему — обычным маршрутом, к VK — мимо VPN).", "ok")
             except (Soft, Dead) as e:
                 raise Fatal(f"FirePacks не отвечает: {e}")
 

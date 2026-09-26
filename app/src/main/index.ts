@@ -21,7 +21,9 @@ import { findSigame, launchSigame } from "./sigame";
 import { initUpdater } from "./updater"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
 // ---------- связь с сервером автора: выключение по ID, отчёты об ошибках, обратная связь ----------
-import { captureFeedbackShot, initRemote, queueError, sendFeedback } from "./remote";
+import { captureFeedbackShot, initRemote, packDupCheck, queueError, sendFeedback } from "./remote";
+import { crc32 } from "node:zlib";
+import { dupQuestions, toReport } from "../core/siq/dupCheck";
 import type { FeedbackRequest } from "../shared/api";
 import type { DownloadWish, FetchProgress, MediaResult, ProviderConfig, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import { Dictionary } from "../core/words/dict";
@@ -410,6 +412,20 @@ function dto(pkg: Package): PackDTO {
 function closeDoc() {
   doc.reader?.close();
   doc = { media: new Map(), extras: [] };
+}
+
+/** Отпечаток файла «crc32:размер» — как в оглавлении zip; по нему база повторов находит тот же файл в чужом паке. */
+const fingerprints = new WeakMap<EntrySource, string>();
+async function mediaFingerprint(folder: string, name: string): Promise<string> {
+  const m = doc.media.get(key(folder, name));
+  if (!m || !m.size) return "";
+  const cached = fingerprints.get(m.source);
+  if (cached) return cached;
+  const data = await loadEntry(m.source).catch(() => null);
+  if (!data?.length) return "";
+  const fp = `${(crc32(data) >>> 0).toString(16).padStart(8, "0")}:${data.length}`;
+  fingerprints.set(m.source, fp);
+  return fp;
 }
 
 async function loadEntry(src: EntrySource): Promise<Buffer> {
@@ -1336,6 +1352,17 @@ function registerIpc() {
   // Снимок окна — сразу по нажатию 💬, до открытия модалки отзыва (она сама снимок не перекрывает).
   ipcMain.handle("feedback:capture", async () => { if (win) await captureFeedbackShot(win); });
   ipcMain.handle("feedback:send", (_e, req: FeedbackRequest) => sendFeedback(req));
+  ipcMain.handle("dup:check", async (_e, pkg: Package, exclude: number[] = []) => {
+    const qs = dupQuestions(pkg);
+    if (!qs.length) return { ok: false, message: "В паке пока нет вопросов" };
+    const payload = [];
+    for (const q of qs) {
+      const media = await Promise.all(q.refs.map((r) => mediaFingerprint(r.folder, r.name)));
+      payload.push({ text: q.text, answers: q.answers, media: media.filter(Boolean) });
+    }
+    const res = await packDupCheck(payload, exclude.filter((x) => Number.isInteger(x)));
+    return res.ok ? { ok: true, report: toReport(qs, res.data) } : res;
+  });
 }
 
 /**
@@ -3150,7 +3177,14 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     const r = await win.webContents.executeJavaScript(`(async () => {
       [...document.querySelectorAll(".topbar button")].find((b) => b.title.startsWith("Проверить пак"))?.click();
       await new Promise((r) => setTimeout(r, 400));
-      return [...document.querySelectorAll(".pc-list li")].map((li) => li.textContent);
+      // --dup-check=1: ещё нажать «Найти повторы» и дождаться ответа сервера (до 40 с)
+      if (${JSON.stringify(Boolean(arg("dup-check")))}) {
+        [...document.querySelectorAll(".pc-dups button")].find((b) => b.textContent === "Найти повторы")?.click();
+        await new Promise((r) => setTimeout(r, 200));
+        for (let i = 0; i < 80 && document.querySelector(".pc-dups button[disabled]"); i++) await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      return [...document.querySelectorAll(".pc-list li, .pc-dups p")].map((li) => li.textContent);
     })()`);
     console.log("САМОПРОВЕРКА проверки пака:", JSON.stringify(r));
   }
