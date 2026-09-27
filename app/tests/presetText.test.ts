@@ -13,7 +13,7 @@ describe("assembleSystem", () => {
   it("собирает ядро, примеры, словарь уточнений и общие правила", () => {
     const text = assembleSystem(kids);
     expect(text.startsWith(kids.system)).toBe(true);
-    expect(text).toContain("«Титаник» → a man and a woman");
+    expect(text).toContain("«Титаник» → a huge flat side view of a ship");
     expect(text).toContain("«бензопила» = a motorized chainsaw");
     expect(text).toContain("never just 'saw'");
     expect(text).toContain("Reply with ONLY the image prompt");

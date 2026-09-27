@@ -129,20 +129,32 @@ export const BUILTIN_PRESETS: ImagePreset[] = [
       "(a year, an original title, a director) overrides your guess. " +
       "Step 2: pick what is unique to THIS work and instantly recognizable from its poster or most famous scene: " +
       "the main character's look and costume, a signature object, creature or place. Avoid generic genre imagery " +
-      "that fits many films. Keep the scene simple enough for a child's drawing: 1-3 figures and one signature object. " +
+      "that fits many films. " +
+      // «Простая сцена» не помогала: модель описывала позы, мимику и одежду, и рисунок выходил как из художки
+      "Step 3: describe the scene the way an 8-9-year-old child would plan the drawing, not the way the film shows it: " +
+      "flat side view, no perspective, no shadows, no facial expressions beyond a dot-eyed smile or frown. " +
+      "People are stiff stick-like figures standing in a row facing the viewer, arms straight out; the key object is huge " +
+      "and out of scale. Add ONE odd obsessive detail the child is fixated on, drawn carefully and repeated many times " +
+      "(every porthole of the ship, every tooth of the chain, every petal), while everything else stays crude. " +
+      "1-3 figures and one signature object, nothing else in the background except a sky strip and a sun in the corner. " +
       "Output format: the FIRST line is exactly `WORK: <original title> (<year>, <director or author>)`, " +
       "then a new line with the image prompt. The WORK line is the only allowed exception to the rules below " +
       "(the app removes it before drawing).",
     examples: [
-      { phrase: "Солнцестояние", scene: "a crying young woman wearing a huge dress and crown made of flowers, people in white embroidered robes dancing around a tall maypole in a sunny meadow" },
-      { phrase: "Титаник", scene: "a man and a woman standing at the very tip of a giant ship's bow with arms spread wide, an iceberg ahead" },
-      { phrase: "Ёжик в тумане", scene: "a small hedgehog carrying a tiny bundle, lost in thick white fog, a white horse's head emerging from it" },
-      { phrase: "Техасская резня бензопилой", scene: "a huge man in a leather mask and apron swinging a motorized chainsaw with a long toothed chain in front of an old farmhouse" },
+      { phrase: "Солнцестояние", scene: "a stick-figure girl in a triangle dress with a giant flower crown, tears drawn as blue drops, five identical stick figures in white triangles standing in a row next to a tall pole with ribbons, every flower of the crown drawn separately with exactly five petals" },
+      { phrase: "Титаник", scene: "a huge flat side view of a ship with four striped funnels and dozens of identical round portholes in perfect rows, two tiny stick figures with arms straight out on the pointy front, a white triangle iceberg ahead" },
+      { phrase: "Ёжик в тумане", scene: "a round hedgehog with dozens of identical straight spikes carrying a little bundle on a stick, grey scribbled fog around him, a white horse head sticking out of the fog" },
+      { phrase: "Техасская резня бензопилой", scene: "a big stick-figure man with a square mask face and an apron holding a motorized chainsaw bigger than himself, every tooth of the chain drawn one by one, a square house with a triangle roof behind him" },
     ],
     glossary: COMMON_GLOSSARY,
     // детский рисунок — свой стиль: приложение дописывает его к сцене, как галочки у других пресетов
     styleMode: "own",
-    styleText: "Style: a drawing by a 6-year-old child: wax crayons and felt-tip pens on white paper, wobbly lines, naive proportions, bright uneven colouring.",
+    styleText:
+      "Style: a clumsy amateur drawing by an 8-year-old third-grader on a page torn from a squared school notebook: " +
+      "blue ballpoint pen outlines and a few colored pencils, pressure uneven, colouring scribbled in one direction and going over the lines, " +
+      "eraser smudges and a crossed-out attempt, stick-figure people with circle heads and dot eyes, no perspective, no shading, " +
+      "wrong proportions, rigid symmetry, one small detail repeated obsessively. Not a stylized illustration, not skilled, not cute: " +
+      "it must look genuinely made by a child who cannot draw well. Photo of the real notebook page.",
     builtin: true,
   },
   {
