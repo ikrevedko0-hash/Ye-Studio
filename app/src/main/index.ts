@@ -80,8 +80,6 @@ interface Doc {
 }
 
 let doc: Doc = { media: new Map(), extras: [] };
-/** Путь последней снятой афиши — «Опубликовать в ВК» заодно показывает её в папке. */
-let lastPosterPath: string | undefined;
 let win: BrowserWindow | null = null;
 /** Идущая сейчас обработка медиа — чтобы её можно было отменить. */
 let currentJob: AbortController | null = null;
@@ -835,15 +833,7 @@ function registerIpc() {
     await mkdir(dir, { recursive: true });
     const out = join(dir, `${sanitizeWinName(packName)} — афиша.png`);
     await renderPoster(buildPosterHtml(pkg), out);
-    lastPosterPath = out;
     return out;
-  });
-
-  // Адрес жёстко зашит: окно не принимает URL от рендерера, чтобы «Опубликовать в ВК» нельзя было
-  // подменить чужим адресом. Если афиша уже снята — заодно показываем её в папке.
-  ipcMain.handle("publish:openVk", () => {
-    if (lastPosterPath && existsSync(lastPosterPath)) shell.showItemInFolder(lastPosterPath);
-    return shell.openExternal("https://vk.com/feed");
   });
 
   // ---------- медиацентр: поиск и загрузка из внешних источников ----------
@@ -3091,7 +3081,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       window.__proposalsText = ${JSON.stringify(json)};
       let btn = null;
-      for (let i = 0; i < 60 && !btn; i++) { await wait(100); btn = [...document.querySelectorAll(".topbar button")].find((b) => b.textContent.includes("Вставить из AI")); }
+      for (let i = 0; i < 60 && !btn; i++) { await wait(100); btn = [...document.querySelectorAll(".media-strip button")].find((b) => b.textContent.includes("Вставить из AI")); }
       if (!btn) return { ok: false, why: "нет кнопки «Вставить из AI»" };
       btn.click();
       for (let i = 0; i < 600; i++) {

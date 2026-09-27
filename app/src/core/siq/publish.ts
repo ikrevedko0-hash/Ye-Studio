@@ -1,18 +1,15 @@
 // Текст поста ВКонтакте для окна «📣 Публикация». Чистая функция — без DOM и Electron,
 // чтобы её можно было проверить тестами и не тянуть в неё окно.
 
-import { packStats } from "./helpers";
-import { getAttr, type Package, type Round } from "./model";
+import { getAttr, type Package } from "./model";
 
-export interface VkPostOptions {
-  /** Сколько символов комментария к паку включать (по умолчанию 500). */
-  commentLimit?: number;
-}
+/** Номер из названия «Уе!пак №N» — тот же разбор, что у страницы отзывов (server/reviews/autopublish.py). */
+const YE_PACK_NO = /^\s*Уе!\s*пак\s*№\s*(\d{1,3})\b/i;
 
-/** Финал подписываем словом «Финал» — своё имя раунда (обычно «ФИНАЛ» капсом) в посте не нужно. */
-function roundTitle(r: Round, i: number): string {
-  if (r.type === "final") return "Финал";
-  return r.name?.trim() || `Раунд ${i + 1}`;
+/** Страница отзывов пака: у «Уе!пак №N» — своя (уепак.рф/N), у остальных — общая. */
+export function reviewsUrl(name: string): string {
+  const n = YE_PACK_NO.exec(name)?.[1];
+  return n ? `уепак.рф/${Number(n)}` : "уепак.рф";
 }
 
 /** Тег пака → хэштег ВК: пробелы в «_», всё, кроме букв/цифр/«_», убирается. */
@@ -21,31 +18,30 @@ function tagToHashtag(tag: string): string {
 }
 
 /**
- * Готовый текст поста ВК (обычный текст — ВК не понимает markdown). Пустые/служебные темы
- * (без названия) пропускаются, вопросы не выводятся — пост не должен палить содержимое пака.
+ * Готовый текст поста ВК (обычный текст — ВК не понимает markdown). Коротко и по-человечески:
+ * название, авторы, приглашение и просьба об отзыве. Темы автор решил не перечислять —
+ * длинный список отпугивал, а темы и так видны на афише.
  */
-export function buildVkPost(pkg: Package, opts: VkPostOptions = {}): string {
-  const commentLimit = opts.commentLimit ?? 500;
+export function buildVkPost(pkg: Package): string {
   const name = getAttr(pkg, "name")?.trim() || "Без названия";
   const authors = (pkg.info?.authors ?? []).map((a) => a.trim()).filter(Boolean);
-  const stats = packStats(pkg);
 
   const header = [`📦 ${name}`];
   if (authors.length) header.push(`✍️ Автор(ы): ${authors.join(", ")}`);
-  header.push(`🎯 Раундов: ${stats.rounds} · тем: ${stats.themes} · вопросов: ${stats.questions}`);
 
-  const roundBlocks = (pkg.rounds ?? []).map((r, i) => {
-    const themes = (r.themes ?? []).map((t) => t.name.trim()).filter((n) => n !== "");
-    return [`${roundTitle(r, i)}:`, ...themes.map((t) => `• ${t}`)].join("\n");
-  });
+  const invite = [
+    "Приятной игры! 🎉",
+    "Пак протестирован на живых людях. Играть лучше с фальстартами и ведущим-человеком.",
+  ].join("\n");
 
-  const comment = pkg.info?.comments?.trim();
-  const commentBlock = comment ? comment.slice(0, commentLimit) : undefined;
+  const reviews = [
+    `💬 Сыграли? Загляните на ${reviewsUrl(name)} и расскажите, как вам пак.`,
+    "Читаем каждый отзыв — по ним делаем следующие паки ❤️",
+  ].join("\n");
 
   const tags = (pkg.tags ?? []).map(tagToHashtag).filter(Boolean);
   const hashtags = ["#свояк", "#sigame", "#своя_игра", ...tags.map((t) => `#${t}`)].join(" ");
   const tagsBlock = [hashtags, "Сделано в Ye!Studio"].join("\n");
 
-  const blocks = [header.join("\n"), ...roundBlocks, commentBlock, tagsBlock].filter((b): b is string => !!b);
-  return blocks.join("\n\n");
+  return [header.join("\n"), invite, reviews, tagsBlock].join("\n\n");
 }

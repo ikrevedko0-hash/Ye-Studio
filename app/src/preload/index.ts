@@ -118,7 +118,6 @@ const api: Api = {
   },
   publishFolder: (packPath, packName) => ipcRenderer.invoke("publish:folder", packPath, packName),
   publishPoster: (pkg, packPath, packName) => ipcRenderer.invoke("publish:poster", pkg, packPath, packName),
-  publishOpenVk: () => ipcRenderer.invoke("publish:openVk"),
 
   // ---------- обновления ----------
   appVersion: () => ipcRenderer.invoke("app:version"),

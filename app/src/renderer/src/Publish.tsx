@@ -45,12 +45,6 @@ export function Publish({ pack, onClose }: Props) {
     await window.api.openPath(dir);
   };
 
-  const publishToVk = async () => {
-    await window.api.clipboardWrite(text);
-    await window.api.publishOpenVk();
-    setNote("Текст скопирован. На странице ВК вставьте текст (Ctrl+V) и перетащите афишу из открытой папки");
-  };
-
   return (
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !drawing) onClose(); }}>
       <div className="publish">
@@ -67,14 +61,11 @@ export function Publish({ pack, onClose }: Props) {
         <p className="muted">Символов: {text.length}</p>
 
         <div className="buttons">
-          <button onClick={copyText}><Icon name="paste" />Скопировать текст</button>
+          <button className="primary" onClick={copyText}><Icon name="paste" />Скопировать текст</button>
           <button onClick={() => void drawPoster()} disabled={drawing} title="Одна картинка со всеми раундами и темами пака">
             <Icon name="image" />Картинка со всеми темами
           </button>
           {posterPath && <button onClick={openFolder}>Открыть папку</button>}
-          <button className="primary" onClick={() => void publishToVk()} title="Скопирует текст и откроет страницу ВК">
-            Опубликовать в ВК
-          </button>
         </div>
 
         {posterPath && !posterBroken && (

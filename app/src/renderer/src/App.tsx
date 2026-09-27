@@ -27,7 +27,7 @@ import { AssistantSetup } from "./AssistantSetup";
 import type { FirstRunOptions } from "../../shared/api";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { ThemeTransfer } from "./ThemeTransfer";
-import { TopBar } from "./TopBar";
+import { MediaStrip, TopBar } from "./TopBar";
 import { UpdateBanner } from "./UpdateBanner"; // ---------- обновления ----------
 import { Icon } from "./Icon";
 
@@ -543,6 +543,7 @@ export function App() {
           title="Тяните, чтобы изменить ширину. Двойной щелчок — вернуть как было"
         />
         <div className="editor-col" style={{ width: editorWidth }}>
+          <MediaStrip actions={actions} />
           <QuestionEditor pack={pack} selection={sel} mutate={mutate} addMedia={addMedia} onPriceCommit={() => sel && sortTheme(sel.round, sel.theme)} onMoveTo={questionTo} />
         </div>
       </main>

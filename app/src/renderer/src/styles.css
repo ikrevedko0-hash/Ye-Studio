@@ -171,48 +171,54 @@ label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); fo
 .topbar-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 /* кнопок много: не хватает ширины — название пака и тема уходят на вторую строку, а не сжимаются в ноль */
 .topbar-row:first-child { flex-wrap: wrap; row-gap: 6px; }
-/* шапка — контейнер: в узком окне подписи второстепенных кнопок прячутся (значок + подсказка остаются) */
 .topbar { container-type: inline-size; container-name: topbar; }
-.tb-groups { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.tb-groups button, .tb-pack button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .ico { flex: none; display: block; }
-/* группа: общая рамка, кнопки внутри без своих рамок — видно, что они про одно */
-.tb-group { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); overflow: hidden; }
-.tb-group > button { border: none; border-radius: 0; background: transparent; padding: 5px 10px; }
-.tb-group > button + button { border-left: 1px solid var(--line); }
-.tb-group > button:hover { background: var(--wash); box-shadow: none; }
-.tb-caption { align-self: center; padding: 0 4px 0 9px; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-/* медиа — бирюзовые значки, «Вставить из AI» — главная кнопка */
-.tb-group.media { border-color: color-mix(in srgb, var(--ye-teal, var(--accent)) 45%, var(--line)); }
-.tb-group.media .ico { color: var(--ye-teal, var(--accent)); }
-.tb-group.ai { border-color: transparent; background: transparent; gap: 4px; overflow: visible; }
-.tb-group.ai > button { border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); }
-.tb-group.ai > button + button { border-left: 1px solid var(--line); }
-.tb-group.ai > button.tb-paste { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
-/* меню «Файл» */
-.tb-menu { position: relative; }
-.tb-menu > button { padding: 5px 9px; }
-.tb-menu > button.active { border-color: var(--accent); }
-.tb-menu .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
-.tb-menu-list {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 240px; padding: 4px;
-  background: var(--popover); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.45);
-  display: flex; flex-direction: column;
+.tb-pack button { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Цвета групп кнопок: каждая группа своим цветом, чтобы кнопки не сливались (вариант D3 автора).
+   На светлых темах те же цвета темнее — иначе значок на белом не читается. */
+:root {
+  --c-file: #94a3b8; --c-media: #2dd4bf; --c-words: #fb923c; --c-ai: #a78bfa;
+  --c-check: #34d399; --c-pub: #f472b6; --c-set: #60a5fa; --c-help: #cbd5e1;
 }
-.tb-menu-list button { background: transparent; border: none; text-align: left; padding: 7px 10px; border-radius: 6px; display: flex; align-items: center; gap: 8px; }
-.tb-menu-list button:hover { background: var(--wash); box-shadow: none; }
-.tb-menu-list kbd { margin-left: auto; font: 11px var(--font-ui); color: var(--muted); }
-.tb-menu-list hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; width: auto; }
-/* справа: свойства пака, название, сохранить, тема */
+:root[data-theme="studio"], :root[data-theme="paper"], :root[data-theme="pastel"], :root[data-theme="minimal"] {
+  --c-file: #64748b; --c-media: #0d9488; --c-words: #ea580c; --c-ai: #7c3aed;
+  --c-check: #059669; --c-pub: #db2777; --c-set: #2563eb; --c-help: #475569;
+}
+.k-file, .k-pack { --c: var(--c-file); } .k-media { --c: var(--c-media); } .k-words { --c: var(--c-words); }
+.k-ai { --c: var(--c-ai); } .k-check { --c: var(--c-check); } .k-pub, .k-out { --c: var(--c-pub); }
+.k-set { --c: var(--c-set); } .k-help { --c: var(--c-help); }
+
+/* вкладки разделов: Пак / ИИ / Выпуск */
+.tb-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tb-tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap;
+  background: transparent; border: 1px solid transparent; color: var(--muted); }
+.tb-tab .ico { color: var(--c); }
+.tb-tab:hover { color: var(--text); background: var(--wash); }
+.tb-tab.on { color: var(--text); background: color-mix(in srgb, var(--c) 18%, var(--panel-2)); border-color: color-mix(in srgb, var(--c) 45%, transparent);
+  box-shadow: inset 0 -3px 0 var(--c); }
+.tb-tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+/* кнопки открытого раздела; закрытые разделы в разметке есть, но спрятаны */
+.tb-ribbon { display: none; flex-wrap: wrap; gap: 8px; }
+.tb-ribbon.on { display: flex; }
+.tb-ribbon button, .media-strip button {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 9px; white-space: nowrap;
+  background: color-mix(in srgb, var(--c) 13%, var(--panel-2)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+}
+.tb-ribbon button .ico, .media-strip button .ico { color: var(--c); width: 18px; height: 18px; }
+.tb-ribbon button:hover, .media-strip button:hover { border-color: var(--c); }
+.media-strip button.main { background: var(--c); border-color: var(--c); color: #fff; font-weight: 700; }
+.media-strip button.main .ico { color: #fff; }
+/* Медиа — над редактором вопроса, чтобы мышь не бегала через всё окно */
+.media-strip { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; background: var(--panel); border-left: 1px solid var(--line); border-bottom: 1px dashed var(--line); }
+.media-strip button { height: 34px; padding: 0 11px; font-size: 13px; }
+.tb-feedback { color: var(--c-help); background: transparent; }
+/* справа: свойства пака, название, сохранить, «Автору», тема */
 .tb-pack { display: flex; align-items: center; gap: 8px; flex: 1 1 360px; min-width: min-content; justify-content: flex-end; }
 .save-now { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); padding: 4px 10px; }
-/* сначала прячутся подписи второстепенных кнопок; «Найти в сети», «Скачанное», «Студия тем» — только в самом узком */
-@container topbar (max-width: 1700px) {
-  .tb-groups .tb-label.minor, .tb-pack .tb-label, .tb-caption { display: none; }
-  .tb-group > button, .tb-menu > button { padding: 5px 8px; }
-}
 @container topbar (max-width: 960px) {
-  .tb-groups .tb-label { display: none; }
+  .tb-pack .tb-label { display: none; }
+  .tb-ribbon button { height: 34px; padding: 0 10px; font-size: 13px; }
 }
 .topbar-brand { display: flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; }
 .topbar-brand .logo-ye, .topbar-brand .logo-studio { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
@@ -245,7 +251,7 @@ label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); fo
 .board-wrap { flex: 1; min-width: 0; overflow: auto; padding: 16px; }
 
 /* Граница между табло и редактором вопроса: её тянут мышью, как в редакторах кода. */
-.editor-col { flex-shrink: 0; display: flex; min-width: 0; }
+.editor-col { flex-shrink: 0; display: flex; flex-direction: column; min-width: 0; }
 .splitter { width: 6px; flex-shrink: 0; cursor: col-resize; background: transparent; position: relative; }
 .splitter::after { content: ""; position: absolute; inset: 0 2px; background: var(--line); transition: background .15s; }
 .splitter:hover::after, .splitter.active::after { background: var(--accent); }

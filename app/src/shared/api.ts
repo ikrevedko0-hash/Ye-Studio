@@ -350,8 +350,6 @@ export interface Api {
   publishFolder(packPath: string | undefined, packName: string): Promise<string>;
   /** Афиша со всеми темами пака — одна картинка PNG; возвращает путь сохранённого файла. */
   publishPoster(pkg: Package, packPath: string | undefined, packName: string): Promise<string>;
-  /** Показать афишу в папке (если есть) и открыть vk.com/feed — адрес жёстко зашит в главном процессе. */
-  publishOpenVk(): Promise<void>;
 
   // ---------- обновления ----------
   /** Версия из package.json — «Проверить обновления» в окне «Компоненты» показывает её рядом с кнопкой. */
