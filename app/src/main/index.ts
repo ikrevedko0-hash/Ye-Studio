@@ -16,6 +16,7 @@ import { startRendererServer, type RendererServer } from "./rendererServer";
 import { watchSideBySide } from "./sideBySide";
 import { loginSession, logout, openLoginWindow, probeLoginPage, refreshLoginCookies } from "./youtubeLogin";
 import { prepareQuietSelfTest, SELF_TEST, showQuietly } from "./quietWindow";
+import { enableEditMenu } from "./editMenu";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
 import { findSigame, launchSigame } from "./sigame";
 import { cleanupCode, initUpdater } from "./updater";
@@ -59,6 +60,8 @@ import type { AssistantKind, AssistantStatus, CookiesStatus,FetchResult, MediaEd
 // остаются в старой папке userData — иначе Electron после переименования завёл бы вторую, пустую.
 // Вызывать до app.whenReady() и до первого app.getPath("userData").
 app.setPath("userData", join(app.getPath("appData"), "Мастерская паков"));
+// до создания окон: обработчик вешается на каждое новое окно
+enableEditMenu();
 
 interface MediaEntry {
   folder: string;
