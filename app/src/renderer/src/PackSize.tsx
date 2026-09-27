@@ -28,7 +28,7 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
   const unused = useMemo(() => unusedMedia(pack.pkg, pack.media), [pack]);
   const used = pack.media.filter((m) => !unused.includes(m));
   const bigImages = used.filter((m) => m.folder === "Images" && m.size > IMAGE_MIN_BYTES).sort((a, b) => b.size - a.size);
-  const audios = used.filter((m) => m.folder === "Audio");
+  const sounding = used.filter((m) => m.folder === "Audio" || m.folder === "Video");
   const heavyAv = used.filter((m) => m.folder !== "Images").sort((a, b) => b.size - a.size).slice(0, 10);
   const tips = sizeTips(pack.media, unused);
 
@@ -87,25 +87,28 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
     setBusy("");
   };
 
-  /** Все звуки пака к одной громкости (loudnorm, как галочка в редакторе). */
+  /** Все звуки и видео пака к одной громкости (loudnorm, как галочка в редакторе). */
   const levelAudio = async () => {
-    const list = [...audios];
-    let done = 0;
+    const list = [...sounding];
+    let done = 0, silent = 0;
     for (const [i, m] of list.entries()) {
       setBusy(`Выравниваю громкость: ${i + 1} из ${list.length} — ${m.name}`);
       try {
+        const video = m.folder === "Video";
         // длины файла окно не знает: конец с запасом, ffmpeg остановится на настоящем
         const created = await window.api.editMedia({
           folder: m.folder, name: m.name, suffix: " (громкость)",
-          plan: { start: 0, end: 36000, audio: "only", normalize: true, quality: "high" },
+          plan: { start: 0, end: 36000, audio: video ? "keep" : "only", videoCopy: video || undefined, normalize: true, quality: "high" },
         });
         await swap(m, created, "до выравнивания громкости");
         done++;
       } catch (e) {
-        say(`✘ ${m.name}: ${(e as Error).message}`);
+        // немое видео — не ошибка, выравнивать нечего (текст — NO_AUDIO из core/media/ffmpeg.ts)
+        if ((e as Error).message.includes("в видео нет звука")) silent++;
+        else say(`✘ ${m.name}: ${(e as Error).message}`);
       }
     }
-    say(`✔ Громкость выровнена у ${done} из ${list.length}. Оригиналы — в source/.`);
+    say(`✔ Громкость выровнена у ${done} из ${list.length}${silent ? `, без звука: ${silent}` : ""}. Оригиналы — в source/.`);
     setBusy("");
   };
 
@@ -148,11 +151,11 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
         </section>
 
         <section>
-          <h4>Громкость звуков — {audios.length}</h4>
-          {audios.length > 0 && (
+          <h4>Громкость звуков и видео — {sounding.length}</h4>
+          {sounding.length > 0 && (
             <button className="primary" disabled={!!busy} onClick={levelAudio}
-              title="Все звуки пака станут одинаково громкими: тихие громче, орущие тише. Оригиналы остаются в source/">
-              Выровнять громкость всех звуков
+              title="Все звуки и видео пака станут одинаково громкими: тихие громче, орущие тише. Картинка видео не пережимается. Оригиналы остаются в source/">
+              Выровнять громкость звуков и видео
             </button>
           )}
         </section>

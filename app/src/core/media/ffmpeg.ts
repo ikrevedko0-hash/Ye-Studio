@@ -130,6 +130,15 @@ export class FfmpegMissingError extends Error {
   }
 }
 
+/** Звук просили пересчитать, а в видео его нет. Окно узнаёт по тексту: имя класса через IPC теряется. */
+export const NO_AUDIO = "в видео нет звука";
+export class NoAudioError extends Error {
+  constructor() {
+    super(NO_AUDIO);
+    this.name = "NoAudioError";
+  }
+}
+
 let searchOpts: { setting?: string; resourcesDir?: string; componentDir?: string } = {};
 let found: FfmpegTools | null = null;
 
@@ -299,6 +308,8 @@ export interface MediaPlan {
   fadeOut?: boolean;
   /** выровнять громкость (для звука) */
   normalize?: boolean;
+  /** картинку видео не трогать — копировать как есть, пересчитать только звук */
+  videoCopy?: boolean;
   /** поворот кадра по часовой стрелке */
   rotate?: 0 | 90 | 180 | 270;
   /** отразить по горизонтали (зеркало) */
@@ -436,12 +447,21 @@ export async function transcode(plan: MediaPlan, onProgress?: (p: ProgressInfo) 
     if (r.code === 0) return plan.output;
     // не получилось — молча перекодируем обычным путём
   }
+  if (plan.videoCopy && src && !src.hasAudio) throw new NoAudioError();
   const loud = plan.normalize && plan.audio !== "mute" ? await measuredLoudnorm(plan, signal) : undefined;
   const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-progress", "pipe:1"];
   args.push("-ss", plan.start.toFixed(3), "-to", plan.end.toFixed(3), "-i", plan.input);
   if (!onlyAudio && plan.overlayPng) args.push("-i", plan.overlayPng);
 
-  if (onlyAudio) {
+  // Только звук у видео (выравнивание громкости всего пака): кадры копируем — перекодировать
+  // картинку ради звука значило бы минуты на ролик и потерю качества. Кодек, который mp4 не
+  // примет (vp9 из webm и т. п.), идёт обычным путём с перекодированием.
+  if (plan.videoCopy && src && ["h264", "hevc", "av1", "mpeg4"].includes(src.videoCodec ?? "")) {
+    const af = audioFilter(plan, duration, loud);
+    args.push("-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy");
+    if (af) args.push("-af", af);
+    args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart");
+  } else if (onlyAudio) {
     const af = audioFilter(plan, duration, loud);
     args.push("-vn", "-map", "0:a:0");
     if (af) args.push("-af", af);
