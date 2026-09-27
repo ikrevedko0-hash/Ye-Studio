@@ -9,7 +9,8 @@ import { PointEditor } from "./PointEditor";
 import { PixelTheme } from "./PixelTheme";
 import { replaceImages } from "./pixelWork";
 import { answerDuration, appendMedia, defaultTimedIndex, questionDefaultSec, TIME_DEFAULTS, contentGroups, itemDefaultTime, parseDuration, setAnswerDuration, withDuration, findParam, getOptions, isPointQuestion, isRef, isWithNext, itemKind, mediaKindByName, OPTION_LETTERS, paramItems, SECRET_TYPES, secretPrice, setOptions, setParamText, setPointMode, setQuestionType, setSecretPrice, setWithNext, SPECIAL_TYPES } from "../../core/siq/helpers";
-import type { ContentItem, Param, Question } from "../../core/siq/model";
+import type { ContentItem, Param, Question, Theme } from "../../core/siq/model";
+import { restoreThemeLadder, setThemePrice, themeSamePrice } from "../../core/siq/board";
 import type { MediaInfo, PackDTO } from "../../shared/api";
 import type { Mutate, Selection } from "./App";
 import { Icon } from "./Icon";
@@ -231,6 +232,8 @@ export function QuestionEditor({ pack, selection, mutate, addMedia, onPriceCommi
 
   const edit = (fn: (q: Question) => void) =>
     mutate((p) => fn(p.rounds![selection.round].themes![selection.theme].questions![selection.question]));
+  const editTheme = (fn: (t: Theme) => void) => mutate((p) => fn(p.rounds![selection.round].themes![selection.theme]));
+  const samePrice = themeSamePrice(theme);
 
   const addTo = async (param: string, paths?: string[]) => {
     const added = await addMedia(paths);
@@ -269,7 +272,12 @@ export function QuestionEditor({ pack, selection, mutate, addMedia, onPriceCommi
             value={q.price}
             step={100}
             title="Любая цена. Клетка встанет на место по цене, когда закончите ввод (Enter или щелчок мимо)"
-            onChange={(e) => edit((qq) => { qq.price = e.target.value; })}
+            onChange={(e) => {
+              const v = e.target.value;
+              // «одна цена на всю тему» — новая цена сразу у всех вопросов темы
+              if (samePrice) editTheme((t) => setThemePrice(t, v));
+              else edit((qq) => { qq.price = v; });
+            }}
             onBlur={() => onPriceCommit?.()}
             onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
           />
@@ -282,6 +290,20 @@ export function QuestionEditor({ pack, selection, mutate, addMedia, onPriceCommi
           </select>
         </label>
       </div>
+      {!finalRound && (theme.questions?.length ?? 0) > 1 && (
+        <label className="check inline" title="Все вопросы темы стоят одинаково (например, тема «всё по 300»). Снимете галочку — цены вернутся лесенкой по шкале раунда">
+          <input type="checkbox" checked={samePrice}
+                 onChange={(e) => {
+                   const on = e.target.checked;
+                   mutate((p) => {
+                     const r = p.rounds![selection.round];
+                     if (on) setThemePrice(r.themes![selection.theme], String(q.price));
+                     else restoreThemeLadder(r, selection.theme);
+                   });
+                 }} />
+          Одна цена на всю тему
+        </label>
+      )}
       {onMoveTo && (
         <label>
           Перенести в другую тему

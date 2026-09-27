@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveQuestion, moveQuestionTo, moveTheme, packLogo, setPackAttr, setPackLogo, sortThemeByPrice } from "../src/core/siq/board";
+import { appendTheme, moveQuestion, moveQuestionTo, moveTheme, packLogo, reorderTheme, restoreThemeLadder, setPackAttr, setPackLogo, setThemePrice, sortThemeByPrice, themeSamePrice } from "../src/core/siq/board";
 import { newPackage, newQuestion, newTheme } from "../src/core/siq/helpers";
 import type { Round } from "../src/core/siq/model";
 import { buildContentXml, parseContentXml } from "../src/core/siq/xml";
@@ -131,5 +131,58 @@ describe("атрибуты пака", () => {
 
   it("у нового пака логотипа нет", () => {
     expect(packLogo(newPackage())).toBeUndefined();
+  });
+});
+
+describe("темы внутри раунда и вставка из буфера", () => {
+  const pack = () => { const p = newPackage("П"); p.rounds = [round([100, 200], [100, 200], [100, 200]), round([200, 400])]; return p; };
+  const names = (p: ReturnType<typeof pack>, r = 0) => p.rounds![r].themes!.map((t) => t.name);
+
+  it("тема встаёт на новое место, остальные сдвигаются, цены не меняются", () => {
+    const p = pack();
+    expect(reorderTheme(p, 0, 0, 2)).toBe(true);
+    expect(names(p)).toEqual(["T1", "T2", "T0"]);
+    expect(reorderTheme(p, 0, 2, 0)).toBe(true);
+    expect(names(p)).toEqual(["T0", "T1", "T2"]);
+    expect(tag(p.rounds![0], 0)).toEqual(["0a:100", "0b:200"]);
+  });
+
+  it("на то же место или за край — ничего не делает", () => {
+    const p = pack();
+    expect(reorderTheme(p, 0, 1, 1)).toBe(false);
+    expect(reorderTheme(p, 0, 0, 3)).toBe(false);
+    expect(reorderTheme(p, 5, 0, 1)).toBe(false);
+    expect(names(p)).toEqual(["T0", "T1", "T2"]);
+  });
+
+  it("вставленная тема — в конец раунда, цены по его шкале", () => {
+    const p = pack();
+    const t = round([100, 200, 300]).themes![0];
+    expect(appendTheme(p, 1, t)).toBe(1);
+    expect(tag(p.rounds![1], 1)).toEqual(["0a:200", "0b:400", "0c:600"]);
+    expect(appendTheme(p, 9, t)).toBe(-1);
+  });
+});
+
+describe("одна цена на всю тему", () => {
+  it("галочка стоит только при одной цене у 2+ вопросов", () => {
+    const r = round([300, 300, 300], [100, 200], [500]);
+    expect(themeSamePrice(r.themes![0])).toBe(true);
+    expect(themeSamePrice(r.themes![1])).toBe(false);
+    expect(themeSamePrice(r.themes![2])).toBe(false);
+  });
+
+  it("поставить всем одну цену и вернуть лесенку по шкале раунда", () => {
+    const r = round([100, 200, 300], [100, 200, 300, 400]);
+    setThemePrice(r.themes![1], "300");
+    expect(tag(r, 1)).toEqual(["1a:300", "1b:300", "1c:300", "1d:300"]);
+    restoreThemeLadder(r, 1);
+    expect(tag(r, 1)).toEqual(["1a:100", "1b:200", "1c:300", "1d:400"]);
+  });
+
+  it("других тем с лесенкой нет — шаг от общей цены", () => {
+    const r = round([200, 200, 200]);
+    restoreThemeLadder(r, 0);
+    expect(tag(r, 0)).toEqual(["0a:200", "0b:400", "0c:600"]);
   });
 });

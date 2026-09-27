@@ -181,6 +181,20 @@ export type ThemeTransfer =
   /** round: номер раунда в целевом паке; -1 — новый раунд с именем roundName */
   | { mode: "file"; path: string; round: number; roundName?: string };
 
+/** Тема в буфере Ye!Studio («Копировать тему» → в другом паке «Вставить тему»). */
+export interface ThemeClipInfo {
+  name: string;
+  questions: number;
+  /** файлов темы взято в буфер */
+  files: number;
+  /** на них ссылается тема, но в паке их не было */
+  missing: string[];
+  /** тема из финала */
+  final: boolean;
+  /** из какого пака */
+  from: string;
+}
+
 export interface ThemeTransferResult {
   path: string;
   /** сколько файлов дописано в целевой пак */
@@ -219,6 +233,12 @@ export interface Api {
   pickTargetPack(path?: string): Promise<TargetPack | null>;
   /** Дописать тему со всеми её файлами в другой пак; null — автор отменил выбор файла. */
   transferTheme(theme: Theme, to: ThemeTransfer): Promise<ThemeTransferResult | null>;
+  /** Копировать тему в буфер Ye!Studio вместе с файлами (from — название пака для подписи). */
+  copyTheme(theme: Theme, final: boolean, from: string): Promise<ThemeClipInfo>;
+  /** Что в буфере темы (null — пусто). */
+  themeClip(): Promise<ThemeClipInfo | null>;
+  /** Вставка: файлы темы добавлены в открытый пак, тема (с новыми именами файлов) — вставить самому. */
+  pasteTheme(): Promise<{ theme: Theme; media: MediaInfo[]; renamed: string[] } | null>;
   addMedia(paths?: string[]): Promise<MediaInfo[]>;
   removeMedia(folder: string, name: string): Promise<boolean>;
   reveal(path: string): Promise<void>;

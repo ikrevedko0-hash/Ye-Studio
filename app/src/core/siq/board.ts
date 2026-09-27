@@ -122,10 +122,20 @@ export function moveQuestionTo(pkg: Package, fromRound: number, from: Slot, toRo
  */
 export function moveTheme(pkg: Package, fromRound: number, themeIndex: number, toRound: number): number {
   const src = pkg.rounds?.[fromRound];
-  const dst = pkg.rounds?.[toRound];
-  if (!src?.themes?.[themeIndex] || !dst || fromRound === toRound) return -1;
-  const scale = dst.themes?.[0]?.questions?.map((q) => q.price);
+  if (!src?.themes?.[themeIndex] || !pkg.rounds?.[toRound] || fromRound === toRound) return -1;
   const [theme] = src.themes.splice(themeIndex, 1);
+  return appendTheme(pkg, toRound, theme);
+}
+
+/**
+ * Дописать тему в конец раунда (вставка скопированной темы, перенос между раундами). Цены — по шкале
+ * раунда-приёмника (ряд его первой темы, дальше тем же шагом); в пустой раунд тема идёт со своими ценами.
+ * Возвращает номер темы в раунде или -1.
+ */
+export function appendTheme(pkg: Package, toRound: number, theme: Theme): number {
+  const dst = pkg.rounds?.[toRound];
+  if (!dst) return -1;
+  const scale = dst.themes?.[0]?.questions?.map((q) => q.price);
   if (scale?.length) {
     const prices = [...scale];
     while (prices.length < (theme.questions?.length ?? 0)) prices.push(nextPrice(prices));
@@ -133,6 +143,46 @@ export function moveTheme(pkg: Package, fromRound: number, themeIndex: number, t
   }
   (dst.themes ??= []).push(theme);
   return dst.themes.length - 1;
+}
+
+/** У всех вопросов темы одна цена (галочка «Одна цена на всю тему»); у темы из одного вопроса — нет. */
+export function themeSamePrice(t: Theme): boolean {
+  const qs = t.questions ?? [];
+  return qs.length > 1 && qs.every((q) => String(q.price) === String(qs[0].price));
+}
+
+/** Одна цена всем вопросам темы. */
+export function setThemePrice(t: Theme, price: string): void {
+  for (const q of t.questions ?? []) q.price = price;
+}
+
+/**
+ * Снять «одну цену»: вернуть лесенку. Берём шкалу другой темы раунда с разными ценами (дальше тем же
+ * шагом); такой нет — от общей цены шагом в неё же (200 → 200, 400, 600…).
+ */
+export function restoreThemeLadder(r: Round, themeIndex: number): void {
+  const t = r.themes?.[themeIndex];
+  if (!t?.questions?.length) return;
+  const other = r.themes?.find((x, i) => i !== themeIndex && (x.questions?.length ?? 0) > 1 && !themeSamePrice(x));
+  let prices = other?.questions?.map((q) => q.price) ?? [];
+  if (!prices.length) {
+    const base = Number(t.questions[0].price) || 100;
+    prices = t.questions.map((_, i) => String(base * (i + 1)));
+  }
+  while (prices.length < t.questions.length) prices.push(nextPrice(prices));
+  t.questions.forEach((q, i) => { q.price = prices[i]; });
+}
+
+/**
+ * Поставить тему на другое место в том же раунде: from уходит на место to, остальные сдвигаются.
+ * Цены вопросов не трогаем — в одном раунде у всех тем одна шкала. Возвращает, получилось ли.
+ */
+export function reorderTheme(pkg: Package, round: number, from: number, to: number): boolean {
+  const themes = pkg.rounds?.[round]?.themes;
+  if (!themes || from === to || !themes[from] || to < 0 || to >= themes.length) return false;
+  const [t] = themes.splice(from, 1);
+  themes.splice(to, 0, t);
+  return true;
 }
 
 // ---------- свойства пака ----------

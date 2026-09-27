@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { History } from "../../core/history";
 import { flushSync } from "react-dom";
-import { isSortedByPrice, moveQuestion, moveQuestionTo, moveTheme, sortThemeByPrice, type Relocate, type Slot } from "../../core/siq/board";
+import { appendTheme, isSortedByPrice, moveQuestion, moveQuestionTo, moveTheme, reorderTheme, sortThemeByPrice, type Relocate, type Slot } from "../../core/siq/board";
 import { appendMedia, applyTimeDefaults, packStats, paramItems } from "../../core/siq/helpers";
 import type { Package, Round } from "../../core/siq/model";
-import type { DraftInfo, MediaInfo, PackDTO, WordHit } from "../../shared/api";
+import type { DraftInfo, MediaInfo, PackDTO, ThemeClipInfo, WordHit } from "../../shared/api";
 import { Board } from "./Board";
 import { CollageEditor } from "./CollageEditor";
 import { Feedback } from "./Feedback"; // ---------- связь с сервером автора ----------
@@ -167,6 +167,39 @@ export function App() {
     setSel((s) => (s && s.round === from && s.theme >= ti ? (s.theme === ti ? null : { ...s, theme: s.theme - 1 }) : s));
     setStatus(`Тема «${name}» перенесена в конец раунда «${roundName(to)}», цены — по шкале этого раунда`);
   }, [pack, mutate]);
+
+  /** Тема на другое место в том же раунде; выбранный вопрос едет вместе со своей темой. */
+  const themeReorder = useCallback((ri: number, from: number, to: number) => {
+    if (!pack?.pkg.rounds?.[ri]?.themes?.[from]) return;
+    mutate((p) => { reorderTheme(p, ri, from, to); });
+    setSel((s) => {
+      if (!s || s.round !== ri) return s;
+      if (s.theme === from) return { ...s, theme: to };
+      // остальные темы между from и to сдвигаются на одну позицию
+      if (from < to && s.theme > from && s.theme <= to) return { ...s, theme: s.theme - 1 };
+      if (from > to && s.theme >= to && s.theme < from) return { ...s, theme: s.theme + 1 };
+      return s;
+    });
+  }, [pack, mutate]);
+
+  // ---------- буфер темы: «Копировать тему» здесь → «Вставить тему» в этом или другом паке ----------
+  const [clip, setClip] = useState<ThemeClipInfo | null>(null);
+  useEffect(() => { void window.api.themeClip().then(setClip); }, []);
+  const copyTheme = useCallback(async (ri: number, ti: number) => {
+    const theme = pack?.pkg.rounds?.[ri]?.themes?.[ti];
+    if (!theme || !pack) return;
+    const packName = pack.pkg.attrs.find(([k]) => k === "name")?.[1] ?? "";
+    const info = await window.api.copyTheme(theme, pack.pkg.rounds![ri].type === "final", packName);
+    setClip(info);
+    setStatus(`Тема «${info.name}» скопирована (${info.questions} вопр., файлов: ${info.files}${info.missing.length ? `, не нашлось: ${info.missing.length}` : ""}). Откройте нужный пак и нажмите «Вставить тему» под табло`);
+  }, [pack]);
+  const pasteTheme = useCallback(async (ri: number) => {
+    const r = await window.api.pasteTheme();
+    if (!r) return;
+    for (const m of r.media) window.dispatchEvent(new CustomEvent("media-created", { detail: m }));
+    mutate((p) => { appendTheme(p, ri, r.theme); });
+    setStatus(`Тема «${r.theme.name}» вставлена в конец раунда «${roundName(ri)}», цены — по шкале раунда${r.media.length ? `, файлов добавлено: ${r.media.length}` : ""}${r.renamed.length ? `; переименованы: ${r.renamed.join(", ")}` : ""}`);
+  }, [mutate, pack]);
 
   /** Выбранный вопрос — в конец темы to (в этом или другом раунде). */
   const questionTo = useCallback((toRound: number, toTheme: number) => {
@@ -532,7 +565,9 @@ export function App() {
       <main className="workspace">
         {current ? (
           <Board round={current} roundIndex={round} media={pack.media} selection={sel} onSelect={setSel} mutate={mutate} vtNames={vtNames} onMove={(from, to) => moveQ(round, from, to)} onTransfer={(ti) => setTransfer({ round, theme: ti })}
-                 rounds={rounds.map((r, i) => r.name || `Раунд ${i + 1}`)} onThemeToRound={(ti, to) => themeToRound(round, ti, to)} />
+                 rounds={rounds.map((r, i) => r.name || `Раунд ${i + 1}`)} onThemeToRound={(ti, to) => themeToRound(round, ti, to)}
+                 onThemeReorder={(from, to) => themeReorder(round, from, to)} onCopyTheme={(ti) => void copyTheme(round, ti)}
+                 clip={clip} onPasteTheme={() => void pasteTheme(round)} />
         ) : (
           <div className="empty-note">В паке нет раундов.</div>
         )}

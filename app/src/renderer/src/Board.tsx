@@ -24,6 +24,13 @@ interface Props {
   /** названия всех раундов пака — для переноса темы */
   rounds?: string[];
   onThemeToRound?(themeIndex: number, toRound: number): void;
+  /** поставить тему на другое место в этом раунде (стрелки ↑↓ или ручка ⠿ на другую тему) */
+  onThemeReorder?(from: number, to: number): void;
+  /** «Копировать тему» — в буфер Ye!Studio, вставлять можно в любой пак */
+  onCopyTheme?(themeIndex: number): void;
+  /** что в буфере темы — для кнопки «Вставить тему»; нет — кнопки нет */
+  clip?: { name: string; from: string } | null;
+  onPasteTheme?(): void;
 }
 
 /** Тему тащат на вкладку раунда; данные — «раунд:тема». Читает RoundTabs. */
@@ -108,7 +115,9 @@ function measure(width: number, n: number): { layout: Layout; cell: number; them
 /** Раскладку меняем через View Transitions: клетки плавно переезжают на новые места, а не прыгают. */
 type WithTransition = Document & { startViewTransition?: (cb: () => void) => unknown };
 
-export function Board({ round, roundIndex, selection, onSelect, mutate, onTransfer, onMove, vtNames, rounds, onThemeToRound }: Props) {
+export function Board({ round, roundIndex, selection, onSelect, mutate, onTransfer, onMove, vtNames, rounds, onThemeToRound, onThemeReorder, onCopyTheme, clip, onPasteTheme }: Props) {
+  // тему тащат за ручку ⠿ на другую тему этого раунда — подсветка строки, куда встанет
+  const [themeOver, setThemeOver] = useState<number | null>(null);
   const themes = round.themes ?? [];
   const isFinal = round.type === "final";
   const maxQ = Math.max(1, ...themes.map((t) => t.questions?.length ?? 0));
@@ -228,15 +237,25 @@ export function Board({ round, roundIndex, selection, onSelect, mutate, onTransf
         {themes.map((t, ti) => (
           // у каждой строки своя сетка с одинаковым шаблоном — колонки совпадают, а в узких
           // раскладках название темы может занять всю строку над клетками
-          <div className="board-row" key={ti} style={{ gridTemplateColumns: columns }}>
+          <div className={`board-row${themeOver === ti ? " theme-drop" : ""}`} key={ti} style={{ gridTemplateColumns: columns }}
+               onDragOver={(e) => { if (onThemeReorder && e.dataTransfer.types.includes(THEME_DRAG_TYPE)) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setThemeOver(ti); } }}
+               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setThemeOver((o) => (o === ti ? null : o)); }}
+               onDrop={(e) => {
+                 setThemeOver(null);
+                 const [r, from] = (e.dataTransfer.getData(THEME_DRAG_TYPE) || "").split(":").map(Number);
+                 if (!onThemeReorder || !Number.isInteger(from) || r !== roundIndex) return;
+                 e.preventDefault();
+                 onThemeReorder(from, ti);
+               }}>
             <div className="theme-name" style={{ viewTransitionName: `bt-${ti}` }}>
               {/* за название тянуть нельзя — щелчок по нему открывает переименование; тянут за ручку */}
               {onThemeToRound && editing?.ti !== ti && (
                 <span
                   className="theme-grip"
                   draggable
-                  title="Тяните на вкладку раунда, чтобы перенести тему туда"
+                  title="Тяните на другую тему — поменять порядок; на вкладку раунда — перенести тему туда"
                   onDragStart={(e) => { e.dataTransfer.setData(THEME_DRAG_TYPE, `${roundIndex}:${ti}`); e.dataTransfer.effectAllowed = "move"; }}
+                  onDragEnd={() => setThemeOver(null)}
                 >⠿</span>
               )}
               {editing?.ti === ti ? (
@@ -279,6 +298,9 @@ export function Board({ round, roundIndex, selection, onSelect, mutate, onTransf
                   {rounds.map((name, ri) => ri !== roundIndex && <option key={ri} value={ri}>в раунд «{name}»</option>)}
                 </select>
               )}
+              {onThemeReorder && ti > 0 && <button className="icon" onClick={() => onThemeReorder(ti, ti - 1)} title="Поднять тему выше">↑</button>}
+              {onThemeReorder && ti < themes.length - 1 && <button className="icon" onClick={() => onThemeReorder(ti, ti + 1)} title="Опустить тему ниже">↓</button>}
+              {onCopyTheme && <button className="icon" onClick={() => onCopyTheme(ti)} title="Копировать тему (с картинками и звуком) — потом «Вставить тему» в этом или другом паке">⧉</button>}
               {onTransfer && <button className="icon" onClick={() => onTransfer(ti)} title="Копировать или вырезать тему в другой пак (новый или существующий)">⇄</button>}
               <button className="icon" onClick={() => removeTheme(ti)} title="Удалить тему">×</button>
               </span>
@@ -310,6 +332,11 @@ export function Board({ round, roundIndex, selection, onSelect, mutate, onTransf
       </div>
       <div className="board-actions">
         <button className="add-theme" onClick={addTheme}>+ Тема</button>
+        {clip && onPasteTheme && (
+          <button className="add-theme paste-theme" onClick={onPasteTheme} title={`Тема из буфера${clip.from ? `, скопирована из пака «${clip.from}»` : ""}: встанет в конец этого раунда вместе с файлами`}>
+            Вставить тему «{clip.name}»
+          </button>
+        )}
         {themes.some((t) => t.name.trim() && !hasEmoji(t.name)) && (
           <button className="add-theme" title="Каждой теме раунда без эмодзи — пара по смыслу названия: перед и после"
             onClick={() => mutate((p) => { for (const t of p.rounds![roundIndex].themes ?? []) t.name = decorateThemeName(t.name); })}>

@@ -55,7 +55,7 @@ import { MEDIA_FOLDERS, type Package, type Theme } from "../core/siq/model";
 import { buildPosterHtml } from "../core/siq/poster";
 import { renderPoster } from "./poster";
 import { escapeName, openSiq, unescapeName, writeSiq, ZipReader, type EntrySource, type EntryToWrite } from "../core/siq/zip";
-import type { AssistantKind, AssistantStatus, CookiesStatus,FetchResult, MediaEditRequest, MediaInfo, PackDTO, ProgressInfo, SearchChunk, SearchHit, SearchStart, TargetPack, ThemeTransfer, ThemeTransferResult } from "../shared/api";
+import type { AssistantKind, AssistantStatus, CookiesStatus,FetchResult, MediaEditRequest, MediaInfo, PackDTO, ProgressInfo, SearchChunk, SearchHit, SearchStart, TargetPack, ThemeClipInfo, ThemeTransfer, ThemeTransferResult } from "../shared/api";
 
 // Приложение переименовано в «Ye!Studio» (productName), но данные автора (настройки, ключи, паки)
 // остаются в старой папке userData — иначе Electron после переименования завёл бы вторую, пустую.
@@ -731,7 +731,59 @@ async function transferTheme(theme: Theme, to: ThemeTransfer): Promise<ThemeTran
   }
 }
 
+/**
+ * Буфер темы: «Копировать тему» → открыли другой пак → «Вставить тему». Файлы темы при копировании
+ * выкладываются во временную папку: после открытия другого пака старого архива уже не будет.
+ * Папки буфера не удаляем до выхода — на них ссылаются вставленные, ещё не сохранённые темы.
+ */
+let themeClip: { theme: Theme; info: ThemeClipInfo; files: { folder: string; name: string; path: string }[] } | null = null;
+
+async function copyTheme(theme: Theme, final: boolean, from: string): Promise<ThemeClipInfo> {
+  const dir = join(tmpdir(), `siq-clip-${Date.now()}`);
+  const files: { folder: string; name: string; path: string }[] = [];
+  const missing: string[] = [];
+  for (const ref of themeMediaRefs(theme)) {
+    const src = doc.media.get(key(ref.folder, ref.name));
+    if (!src) { missing.push(`${ref.folder}/${ref.name}`); continue; }
+    const path = join(dir, ref.folder, `${files.length}${extname(ref.name)}`);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, await loadEntry(src.source));
+    files.push({ ...ref, path });
+  }
+  const info: ThemeClipInfo = { name: theme.name, questions: theme.questions?.length ?? 0, files: files.length, missing, final, from };
+  themeClip = { theme: structuredClone(theme), info, files };
+  return info;
+}
+
+/** Вставка из буфера: файлы — в открытый пак (тот же файл не дублируем, совпало имя — новое имя), тема — окну. */
+async function pasteTheme(): Promise<{ theme: Theme; media: MediaInfo[]; renamed: string[] } | null> {
+  if (!themeClip) return null;
+  const renames = new Map<string, string>();
+  const media: MediaInfo[] = [];
+  const renamed: string[] = [];
+  for (const f of themeClip.files) {
+    const have = doc.media.get(key(f.folder, f.name));
+    let name = f.name;
+    if (have) {
+      const [mine, theirs] = await Promise.all([readFile(f.path), loadEntry(have.source)]);
+      if (mine.equals(theirs)) continue; // тот же файл уже в паке (общая заставка, повторная вставка)
+      name = uniqueName(f.folder, f.name);
+      renames.set(key(f.folder, f.name), name);
+      renamed.push(`${f.name} → ${name}`);
+    }
+    const entry: MediaEntry = { folder: f.folder, name, size: (await stat(f.path)).size, source: { kind: "file", path: f.path } };
+    doc.media.set(key(f.folder, name), entry);
+    media.push(mediaInfo(entry));
+  }
+  const theme = structuredClone(themeClip.theme);
+  renameThemeMedia(theme, renames);
+  return { theme, media, renamed };
+}
+
 function registerIpc() {
+  ipcMain.handle("theme:copy", (_e, theme: Theme, final: boolean, from: string) => copyTheme(theme, final, from));
+  ipcMain.handle("theme:clip", () => themeClip?.info ?? null);
+  ipcMain.handle("theme:paste", () => pasteTheme());
   ipcMain.handle("theme:pickPack", (_e, path?: string) => pickTargetPack(path));
   ipcMain.handle("theme:transfer", (_e, theme: Theme, to: ThemeTransfer) => transferTheme(theme, to));
 
@@ -1603,7 +1655,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -2648,6 +2700,55 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     if (!ui?.ok || !t || lost.length) process.exitCode = 1;
   }
 
+  // --theme-clip=<второй пак> [--save-copy=<siq>]: ⧉ на первой теме с картинками → открыть второй пак →
+  // «Вставить тему»; копию сохранить и прочитать с диска — у вставленной темы каждая ссылка находит свой файл.
+  if (data && arg("theme-clip")) {
+    const js = (code: string) => win.webContents.executeJavaScript(code);
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const report: Record<string, unknown> = {};
+    const copied = await js(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      for (let i = 0; i < 80 && !(document.querySelector(".board-row") && window.__pack); i++) await wait(100);
+      const t = (window.__pack?.rounds?.[0]?.themes ?? []).findIndex((t) => /"isRef":"?[Tt]rue/.test(JSON.stringify(t)));
+      const rows = [...document.querySelectorAll(".board-row")];
+      const btn = rows[t]?.querySelector('button[title^="Копировать тему"]');
+      if (!btn) return { ok: false, why: "нет темы с файлами или кнопки ⧉", t };
+      btn.click();
+      return { ok: true, theme: window.__pack.rounds[0].themes[t].name };
+    })()`);
+    report.скопировано = copied;
+    await wait(800);
+    const second = await openPack(arg("theme-clip")!);
+    report.темДо = second.pkg.rounds?.[0]?.themes?.length;
+    win.webContents.send("selftest:load", second);
+    const pasted = await js(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      let btn = null;
+      for (let i = 0; i < 60 && !btn; i++) { await wait(100); btn = document.querySelector(".paste-theme"); }
+      if (!btn) return { ok: false, why: "нет кнопки «Вставить тему»" };
+      const label = btn.textContent;
+      btn.click();
+      await wait(800);
+      return { ok: true, label, themes: window.__pack.rounds[0].themes.map((t) => t.name), status: document.querySelector(".topbar .status")?.textContent };
+    })()`);
+    report.вставлено = pasted;
+    const out = arg("save-copy");
+    let lost = -1;
+    if (out && pasted?.ok) {
+      const pkg = (await js("window.__pack")) as Package;
+      await savePack(pkg, false, out);
+      const check = await openSiq(out);
+      const names = new Set(check.reader.entries.map((e) => e.name));
+      const t = check.pkg.rounds?.[0]?.themes?.at(-1);
+      const refs = t ? themeMediaRefs(t) : [];
+      lost = refs.filter((m) => !names.has(`${m.folder}/${escapeName(m.name)}`)).length;
+      check.reader.close();
+      report.проверкаСохранённого = { тема: t?.name, файлов: refs.length, битыхСсылок: lost };
+    }
+    console.log("САМОПРОВЕРКА буфера темы:", JSON.stringify(report, null, 1));
+    if (!copied?.ok || !pasted?.ok || lost !== 0) process.exitCode = 1;
+  }
+
   // «Как в игре»: нажать кнопку в редакторе, пройти все экраны и снять кадры по дороге.
   if (data && arg("game-preview")) {
     const js = (code: string) => win.webContents.executeJavaScript(code);
@@ -3433,7 +3534,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;
