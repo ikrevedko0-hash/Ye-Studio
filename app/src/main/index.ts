@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
-import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve as resolvePath } from "node:path";
 import { app, BrowserWindow, clipboard, dialog, ipcMain, protocol, shell } from "electron";
@@ -1165,6 +1165,14 @@ function registerIpc() {
     const dir = currentSourceDir();
     const full = join(dir, basename(file));
     if (!existsSync(full)) return false;
+    // Файл из библиотеки, добавленный в пак, пак читает прямо отсюда. Удалили его из библиотеки —
+    // и сохранение пака падало с ENOENT. Пак получает свою копию: убрать из пака — отдельное действие.
+    for (const m of doc.media.values()) {
+      if (m.source.kind !== "file" || resolvePath(m.source.path) !== resolvePath(full)) continue;
+      const copy = join(tmpdir(), `siq-kept-${Date.now()}-${basename(full).replace(/[^\w.-]/g, "_")}`);
+      await copyFile(full, copy);
+      m.source = { kind: "file", path: copy };
+    }
     await shell.trashItem(full);
     await removeRecord(dir, basename(file));
     return true;
