@@ -6,6 +6,10 @@
 import { useState } from "react";
 import { Icon } from "./Icon";
 
+// window.api.ui — снимок настроек на запуске и не меняется: без своей копии галочка при повторном
+// открытии окна показывала бы старое значение
+let reportPref = window.api.ui.reportErrors ?? true;
+
 interface Props {
   onClose(): void;
 }
@@ -17,6 +21,8 @@ export function Feedback({ onClose }: Props) {
   const [withLog, setWithLog] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  // отчёты об ошибках — постоянная настройка, не только для этого письма (раньше жила в «Настройке ИИ» → «Прочее»)
+  const [reportErrors, setReportErrors] = useState(reportPref);
 
   const send = async () => {
     if (!text.trim()) {
@@ -74,6 +80,14 @@ export function Feedback({ onClose }: Props) {
           <button className="primary" onClick={() => void send()} disabled={busy}>Отправить</button>
         </div>
         {status && <p className="muted">{status}</p>}
+
+        <hr />
+        <label className="check">
+          <input type="checkbox" checked={reportErrors}
+                 onChange={(e) => { reportPref = e.target.checked; setReportErrors(e.target.checked); void window.api.setUi("reportErrors", e.target.checked); }} />
+          Всегда отправлять отчёты об ошибках автору
+        </label>
+        <p className="muted">Только текст ошибки и версия программы. Паки, ключи и файлы не отправляются.</p>
       </div>
     </div>
   );

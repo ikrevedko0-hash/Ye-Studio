@@ -20,9 +20,7 @@ export function AiSettings({ onClose }: Props) {
   const [s, setS] = useState<Settings | null>(null);
   const [templates, setTemplates] = useState<ProviderTemplate[]>([]);
   const [sel, setSel] = useState<string>("");
-  const [tab, setTab] = useState<"services" | "queues" | "other">("services");
-  // ---------- связь с сервером автора: галочка отчётов об ошибках ----------
-  const [reportErrors, setReportErrors] = useState(window.api.ui.reportErrors ?? true);
+  const [tab, setTab] = useState<"services" | "queues">("services");
   const [dirty, setDirty] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -134,9 +132,7 @@ export function AiSettings({ onClose }: Props) {
           <b>Настройки ИИ</b>
           <span className="ws-tabs">
             <button className={tab === "services" ? "sel" : ""} onClick={() => setTab("services")}>Сервисы и ключи</button>
-            <button className={tab === "queues" ? "sel" : ""} onClick={() => setTab("queues")}>Очереди моделей</button>
-            <button className={tab === "other" ? "sel" : ""} onClick={() => setTab("other")}>Прочее</button>
-          </span>
+            <button className={tab === "queues" ? "sel" : ""} onClick={() => setTab("queues")}>Очереди моделей</button>          </span>
           <span className="spacer" />
           <button onClick={() => void loadQuota()} disabled={quotaBusy} title="Спросить у сервисов остатки">
             {quotaBusy ? "Узнаю остатки…" : "↻ Остатки"}
@@ -249,7 +245,7 @@ export function AiSettings({ onClose }: Props) {
               )}
             </div>
           </div>
-        ) : tab === "queues" ? (
+        ) : (
           <div className="ai-queues">
             <Queue
               title="Текст (сцены для картинок и прочие подсказки)"
@@ -264,22 +260,6 @@ export function AiSettings({ onClose }: Props) {
               paid={new Set(s.providers.filter((p) => p.paid).map((p) => p.id))}
               onChange={(imageChain) => { setS({ ...s, imageChain }); setDirty(true); }}
             />
-          </div>
-        ) : (
-          // ---------- связь с сервером автора ----------
-          <div className="ai-queues">
-            <section className="ai-queue">
-              <b>Связь с автором</b>
-              <label className="ai-check">
-                <input
-                  type="checkbox"
-                  checked={reportErrors}
-                  onChange={(e) => { setReportErrors(e.target.checked); void window.api.setUi("reportErrors", e.target.checked); }}
-                />
-                Отправлять отчёты об ошибках автору
-              </label>
-              <span className="muted">Только текст ошибки и версия программы. Паки, ключи и файлы не отправляются.</span>
-            </section>
           </div>
         )}
 
