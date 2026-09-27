@@ -17,6 +17,7 @@ import { watchSideBySide } from "./sideBySide";
 import { loginSession, logout, openLoginWindow, probeLoginPage, refreshLoginCookies } from "./youtubeLogin";
 import { prepareQuietSelfTest, SELF_TEST, showQuietly } from "./quietWindow";
 import { enableEditMenu } from "./editMenu";
+import { upscaleImage, upscalerReady } from "./upscale";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
 import { findSigame, launchSigame } from "./sigame";
 import { cleanupCode, initUpdater } from "./updater";
@@ -813,6 +814,16 @@ function registerIpc() {
     await writeFile(out, Buffer.from(m[2], "base64"));
     const entry: MediaEntry = { folder: "Images", name, size: (await stat(out)).size, source: { kind: "file", path: out } };
     doc.media.set(key("Images", name), entry);
+    return mediaInfo(entry);
+  });
+
+  /** ИИ-увеличение (Real-ESRGAN ×4): результат — новым JPEG рядом, оригинал в паке остаётся. */
+  ipcMain.handle("image:upscaleReady", () => upscalerReady());
+  ipcMain.handle("image:upscale", async (_e, folder: string, name: string, w: number, h: number) => {
+    const out = await upscaleImage(await materialize(folder, name), w, h);
+    const outName = uniqueName("Images", `${name.replace(/\.[^.]+$/, "")} (ИИ ×4)${extname(out)}`);
+    const entry: MediaEntry = { folder: "Images", name: outName, size: (await stat(out)).size, source: { kind: "file", path: out } };
+    doc.media.set(key("Images", outName), entry);
     return mediaInfo(entry);
   });
 

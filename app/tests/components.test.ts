@@ -143,4 +143,12 @@ describe("чем запускать yt-dlp", () => {
   it("в манифесте yt-dlp — exe и zip плагина в папке компонентов", () => {
     expect(planTool(manifest, "yt-dlp").map((f) => f.dest)).toEqual(["yt-dlp/yt-dlp.exe", "yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip"]);
   });
+
+  it("ИИ-увеличение — модель Real-ESRGAN и Vulkan-сборка sd.cpp в папке upscaler, меньше 100 МБ", () => {
+    const files = planTool(manifest, "upscaler");
+    expect(files.map((f) => f.path ?? f.unzipTo)).toEqual(["upscaler/RealESRGAN_x4plus.pth", "upscaler"]);
+    expect(totalBytes(files)).toBeLessThan(100 * 1024 * 1024);
+    // тот же архив, что у профиля Vulkan: сумма одна
+    expect(manifest.files["sd-vulkan-upscaler"].sha256).toBe(manifest.files["sd-vulkan"].sha256);
+  });
 });

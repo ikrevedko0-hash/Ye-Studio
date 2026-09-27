@@ -50,6 +50,8 @@ const api: Api = {
   grabFrame: (folder, name, timeSec) => ipcRenderer.invoke("media:frame", folder, name, timeSec),
   editMedia: (req) => ipcRenderer.invoke("media:edit", req),
   saveImage: (dataUrl, suggestedName) => ipcRenderer.invoke("image:save", dataUrl, suggestedName),
+  upscaleReady: () => ipcRenderer.invoke("image:upscaleReady"),
+  upscaleImage: (folder, name, w, h) => ipcRenderer.invoke("image:upscale", folder, name, w, h),
   mediaBytes: (folder, name) => ipcRenderer.invoke("media:bytes", folder, name),
   cancelEdit: () => ipcRenderer.invoke("media:cancel"),
   // Настройки окна приходят синхронно: они нужны в первом же кадре, до всякой отрисовки.

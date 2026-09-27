@@ -72,6 +72,20 @@
       "sha256": "bce874dfa25896c2798e0f4f8147b7b22e785479eb1e459ab232bf2506c95016",
       "path": "yt-dlp/plugins/bgutil-ytdlp-pot-provider.zip"
     },
+    "realesrgan-x4": {
+      "title": "Real-ESRGAN x4plus",
+      "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      "size": 67040989,
+      "sha256": "4fa0d38905f75ac06eb49a7951b426670021be3018265fd191d2125df9d682f1",
+      "path": "upscaler/RealESRGAN_x4plus.pth"
+    },
+    "sd-vulkan-upscaler": {
+      "title": "sd.cpp (Vulkan) для увеличения",
+      "url": "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-905-70c1dbc/sd-master-70c1dbc-bin-win-vulkan-x64.zip",
+      "size": 31963841,
+      "sha256": "5e7ed195290867a1a9d799932b4b2a46fc3a656f1ca08407e4f4ae359079c492",
+      "unzipTo": "upscaler"
+    },
     "ffmpeg-zip": {
       "title": "ffmpeg 9.0.2 (essentials)",
       "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
@@ -171,6 +185,13 @@
       "version": "9.0.2",
       "files": [
         "ffmpeg-zip"
+      ]
+    },
+    "upscaler": {
+      "version": "x4plus",
+      "files": [
+        "realesrgan-x4",
+        "sd-vulkan-upscaler"
       ]
     }
   }

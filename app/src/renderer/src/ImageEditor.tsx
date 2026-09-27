@@ -8,6 +8,7 @@ import {
   type CoverShape, type CoverStyle, type Frac, type OutFormat, type PixelPlan, type SilhouettePlan,
 } from "./imageCanvas";
 import { blockGrid, clampBlocks, PIXEL_BLOCKS, PIXEL_PRESETS, revealSteps } from "../../core/media/pixelate";
+import { worthUpscaling } from "../../core/media/upscale";
 import type { MediaInfo } from "../../shared/api";
 import { fractionIn, useFitBox } from "./fitBox";
 
@@ -45,6 +46,25 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // ИИ-увеличение: стоит ли компонент (null — ещё не знаем) и идёт ли сейчас
+  const [upReady, setUpReady] = useState<boolean | null>(null);
+  const [upscaling, setUpscaling] = useState(false);
+  useEffect(() => { void window.api.upscaleReady().then(setUpReady).catch(() => setUpReady(false)); }, []);
+
+  const upscale = async () => {
+    if (!img) return;
+    if (upReady === false) { setError("ИИ-увеличение не установлено: «Настройки» → «Компоненты» → «ИИ-увеличение» → «Установить» (~95 МБ)."); return; }
+    setBusy(true); setUpscaling(true); setError("");
+    try {
+      const created = await window.api.upscaleImage(media.folder, media.name, img.naturalWidth, img.naturalHeight);
+      window.dispatchEvent(new CustomEvent("media-created", { detail: created }));
+      onDone(created);
+    } catch (e) {
+      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""));
+    } finally {
+      setBusy(false); setUpscaling(false);
+    }
+  };
 
   const [tool, setTool] = useState<Tool>("move");
   const [coverStyle, setCoverStyle] = useState<CoverStyle>("solid");
@@ -404,7 +424,17 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
             )}
 
             <div className="apply-box">
-              <button className="primary" onClick={apply} disabled={busy || !img}>{busy ? "Сохраняю…" : "Применить"}</button>
+              {img && (
+                <button onClick={() => void upscale()} disabled={busy || !worthUpscaling(img.naturalWidth, img.naturalHeight)}
+                  title={!worthUpscaling(img.naturalWidth, img.naturalHeight)
+                    ? "Картинка и так большая — увеличивать незачем"
+                    : upReady === false
+                      ? "Сначала поставьте «ИИ-увеличение» в «Настройки» → «Компоненты» (~95 МБ)"
+                      : "Увеличить в 4 раза нейросетью Real-ESRGAN (до 1920 px): резче, без выдуманных деталей. Остальные правки не применяются"}>
+                  {upscaling ? "Увеличиваю…" : "Увеличить ×4 (ИИ)"}
+                </button>
+              )}
+              <button className="primary" onClick={apply} disabled={busy || !img}>{busy && !upscaling ? "Сохраняю…" : "Применить"}</button>
             </div>
             {error && <p className="err">{error}</p>}
             <p className="hint">Исходный файл остаётся в паке, результат добавляется рядом новым файлом.</p>

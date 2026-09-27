@@ -266,6 +266,10 @@ export interface Api {
   editMedia(req: MediaEditRequest): Promise<MediaInfo>;
   /** Готовая картинка (data:image/…;base64,…) из редактора картинок или коллажа — кладётся в Images */
   saveImage(dataUrl: string, suggestedName: string): Promise<MediaInfo>;
+  /** Стоит ли ИИ-увеличение (модель Real-ESRGAN и sd-cli) — «Компоненты». */
+  upscaleReady(): Promise<boolean>;
+  /** ИИ-увеличение ×4 (до 1920 px): новый JPEG в Images, оригинал остаётся. w, h — исходный размер. */
+  upscaleImage(folder: string, name: string, w: number, h: number): Promise<MediaInfo>;
   /** Содержимое файла из пака: для canvas, куда siq:// не дотягивается */
   mediaBytes(folder: string, name: string): Promise<{ type: string; data: Uint8Array }>;
   cancelEdit(): Promise<void>;

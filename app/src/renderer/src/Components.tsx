@@ -28,6 +28,7 @@ function eta(p: InstallProgress): string {
 const TOOLS = [
   { id: "ffmpeg", title: "ffmpeg", what: "обрезка, перекодирование, коллажи, волна звука", without: "медиа-редакторы (обрезка, перекодирование) не работают" },
   { id: "yt-dlp", title: "yt-dlp", what: "видео с YouTube, Rutube, Instagram и по ссылкам", without: "видео из интернета не ищется; картинки и звук — работают" },
+  { id: "upscaler", title: "ИИ-увеличение", what: "кнопка «Увеличить ×4 (ИИ)» в редакторе картинок (Real-ESRGAN)", without: "мелкие картинки не увеличить нейросетью" },
 ];
 
 const PHASE: Record<InstallProgress["phase"], string> = {
@@ -145,7 +146,8 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
             <div className="cmp-tool-list">
               {TOOLS.filter((x) => state.tools[x.id]).map((x) => {
                 const st = state.tools[x.id];
-                const inSystem = x.id === "ffmpeg" ? !!t?.ffmpeg : !!t?.ytdlp;
+                // апскейлер в системе не ищем: он бывает только нашим компонентом
+                const inSystem = x.id === "ffmpeg" ? !!t?.ffmpeg : x.id === "yt-dlp" ? !!t?.ytdlp : false;
                 return (
                   <div key={x.id} className="cmp-installed">
                     {st.component ? (
