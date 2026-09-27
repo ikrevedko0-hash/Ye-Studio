@@ -189,7 +189,7 @@ label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); fo
 .k-ai { --c: var(--c-ai); } .k-check { --c: var(--c-check); } .k-pub, .k-out { --c: var(--c-pub); }
 .k-set { --c: var(--c-set); } .k-help { --c: var(--c-help); }
 
-/* вкладки разделов: Пак / ИИ / Выпуск */
+/* вкладки разделов: Пак / Настройки / Выпуск */
 .tb-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .tb-tab { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 8px; font-weight: 600; white-space: nowrap;
   background: transparent; border: 1px solid transparent; color: var(--muted); }
