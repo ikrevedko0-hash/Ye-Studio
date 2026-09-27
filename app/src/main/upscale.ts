@@ -3,7 +3,7 @@
 
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { ffmpegTools } from "../core/media/ffmpeg";
@@ -13,9 +13,9 @@ import { componentPath, componentsDir } from "./components";
 export const UPSCALER_DIR = "upscaler";
 const MODEL = "RealESRGAN_x4plus.pth";
 
-function run(exe: string, args: string[], timeoutMs: number): Promise<{ ok: boolean; out: string }> {
+function run(exe: string, args: string[], timeoutMs: number, cwd?: string): Promise<{ ok: boolean; out: string }> {
   return new Promise((resolve) => {
-    execFile(exe, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
+    execFile(exe, args, { cwd, timeout: timeoutMs, windowsHide: true, maxBuffer: 16 * 1024 * 1024 }, (err, stdout, stderr) =>
       resolve({ ok: !err, out: `${stdout ?? ""}${stderr ?? ""}` }));
   });
 }
@@ -40,28 +40,40 @@ export async function upscaleImage(input: string, w: number, h: number, factor: 
   const cli = pickCli({ modelBin: model ? join(model, "bin") : undefined, upscalerDir: dir, exists: existsSync, join });
   if (!cli) throw new Error("не найден sd-cli.exe — переустановите «ИИ-увеличение» в «Компонентах»");
 
+  // sd-cli открывает файлы узкими (ANSI) путями: «Рабочий стол», «история ирана.jpg» и русское имя
+  // пользователя во временной папке он не открывает. Поэтому всё, что он читает и пишет, лежит под
+  // латинскими именами в work/ папки апскейлера, а сам он запускается оттуда с относительными путями
+  // (так же обходим это у sd-server — см. AGENTS.md). ffmpeg и Node юникод понимают.
   const ff = ffmpegTools();
   const stamp = Date.now();
+  const work = join(dir, "work");
+  await mkdir(work, { recursive: true });
   const tmp: string[] = [];
   try {
     // sd-cli читает PNG и JPEG; WebP, GIF и прочее сначала переводим в PNG
-    let src = input;
-    if (![".png", ".jpg", ".jpeg"].includes(extname(input).toLowerCase())) {
+    const ext = extname(input).toLowerCase();
+    const readable = [".png", ".jpg", ".jpeg"].includes(ext);
+    const srcName = `in-${stamp}${readable ? ext : ".png"}`;
+    tmp.push(join(work, srcName));
+    if (readable) await copyFile(input, join(work, srcName));
+    else {
       if (!ff) throw new Error("для этого формата картинки нужен ffmpeg — поставьте его в «Компонентах»");
-      src = join(tmpdir(), `siq-up-src-${stamp}.png`);
-      tmp.push(src);
-      const c = await run(ff.ffmpeg, ["-y", "-loglevel", "error", "-i", input, "-frames:v", "1", src], 60_000);
+      const c = await run(ff.ffmpeg, ["-y", "-loglevel", "error", "-i", input, "-frames:v", "1", join(work, srcName)], 60_000);
       if (!c.ok) throw new Error("не удалось прочитать картинку: " + c.out.slice(-200));
     }
-    const big = join(tmpdir(), `siq-up-${stamp}.png`);
+    const bigName = `out-${stamp}.png`;
+    const big = join(work, bigName);
     tmp.push(big);
-    const r = await run(cli.exe, ["-M", "upscale", "--upscale-model", modelFile, "-i", src, "-o", big], 10 * 60_000);
-    if (!r.ok || !existsSync(big)) throw new Error("увеличение не удалось: " + (r.out.trim().split("\n").slice(-3).join(" ") || "sd-cli завершился с ошибкой"));
+    const r = await run(cli.exe, ["-M", "upscale", "--upscale-model", MODEL, "-i", `work/${srcName}`, "-o", `work/${bigName}`], 10 * 60_000, dir);
+    if (!r.ok || !existsSync(big)) {
+      const why = r.out.split("\n").filter((l) => l.includes("ERROR")).slice(-2).join(" ").replace(/\[ERROR\s*\]\s*\S+\s*-\s*/g, "");
+      throw new Error("увеличение не удалось: " + (why || "sd-cli завершился с ошибкой"));
+    }
 
-    // без ffmpeg отдаём как есть (PNG ×4); с ним — JPEG нужного размера, пак не распухает
-    if (!ff) { tmp.splice(tmp.indexOf(big), 1); return big; }
     const size = upscaledSize(w, h, factor);
-    const out = join(tmpdir(), `siq-up-${stamp}.jpg`);
+    // без ffmpeg отдаём PNG как есть; с ним — JPEG нужного размера, пак не распухает
+    const out = join(tmpdir(), `siq-up-${stamp}.${ff ? "jpg" : "png"}`);
+    if (!ff) { await copyFile(big, out); return out; }
     const s = await run(ff.ffmpeg, ["-y", "-loglevel", "error", "-i", big, "-vf", `scale=${size.w}:${size.h}:flags=lanczos`, "-q:v", "2", out], 60_000);
     if (!s.ok) throw new Error("не удалось сохранить результат: " + s.out.slice(-200));
     return out;
