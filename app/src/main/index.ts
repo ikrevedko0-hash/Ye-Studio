@@ -1387,8 +1387,10 @@ async function editMedia(req: MediaEditRequest, onProgress?: (p: ProgressInfo) =
   const onlyAudio = req.plan.audio === "only";
   const ext = onlyAudio ? ".mp3" : ".mp4";
   const folder = onlyAudio ? "Audio" : "Video";
-  const base = req.name.replace(/\.[^.]+$/, "");
-  const outName = uniqueName(folder, `${base} (обрезано)${ext}`);
+  const suffix = req.suffix ?? " (обрезано)";
+  // повторная обработка не копит приписки: «звук (громкость) (громкость)»
+  const base = req.name.replace(/\.[^.]+$/, "").replace(suffix, "");
+  const outName = uniqueName(folder, `${base}${suffix}${ext}`);
   const out = join(tmpdir(), `siq-edit-${Date.now()}${ext}`);
 
   let overlayPng: string | undefined;

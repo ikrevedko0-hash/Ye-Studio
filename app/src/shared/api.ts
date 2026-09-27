@@ -117,6 +117,8 @@ export interface MediaEditRequest {
   plan: EditPlan;
   /** PNG со сплошными фигурами во всю ширину исходного кадра, data:image/png;base64,… */
   overlayPngBase64?: string;
+  /** Приписка к имени нового файла; по умолчанию « (обрезано)». */
+  suffix?: string;
 }
 
 /** Выдача поиска: результаты вперемешку плюс источники, которые не ответили. */

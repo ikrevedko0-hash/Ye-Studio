@@ -28,6 +28,7 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
   const unused = useMemo(() => unusedMedia(pack.pkg, pack.media), [pack]);
   const used = pack.media.filter((m) => !unused.includes(m));
   const bigImages = used.filter((m) => m.folder === "Images" && m.size > IMAGE_MIN_BYTES).sort((a, b) => b.size - a.size);
+  const audios = used.filter((m) => m.folder === "Audio");
   const heavyAv = used.filter((m) => m.folder !== "Images").sort((a, b) => b.size - a.size).slice(0, 10);
   const tips = sizeTips(pack.media, unused);
 
@@ -86,6 +87,28 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
     setBusy("");
   };
 
+  /** Все звуки пака к одной громкости (loudnorm, как галочка в редакторе). */
+  const levelAudio = async () => {
+    const list = [...audios];
+    let done = 0;
+    for (const [i, m] of list.entries()) {
+      setBusy(`Выравниваю громкость: ${i + 1} из ${list.length} — ${m.name}`);
+      try {
+        // длины файла окно не знает: конец с запасом, ffmpeg остановится на настоящем
+        const created = await window.api.editMedia({
+          folder: m.folder, name: m.name, suffix: " (громкость)",
+          plan: { start: 0, end: 36000, audio: "only", normalize: true, quality: "high" },
+        });
+        await swap(m, created, "до выравнивания громкости");
+        done++;
+      } catch (e) {
+        say(`✘ ${m.name}: ${(e as Error).message}`);
+      }
+    }
+    say(`✔ Громкость выровнена у ${done} из ${list.length}. Оригиналы — в source/.`);
+    setBusy("");
+  };
+
   const pct = Math.min(100, (mb(total) / PACK_TARGET_MB) * 100);
   const over = mb(total) > PACK_TARGET_MB;
 
@@ -121,6 +144,16 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
                 Ужать все: {IMAGE_MAX_SIDE} px, JPEG {IMAGE_QUALITY * 100} %
               </button>
             </>
+          )}
+        </section>
+
+        <section>
+          <h4>Громкость звуков — {audios.length}</h4>
+          {audios.length > 0 && (
+            <button className="primary" disabled={!!busy} onClick={levelAudio}
+              title="Все звуки пака станут одинаково громкими: тихие громче, орущие тише. Оригиналы остаются в source/">
+              Выровнять громкость всех звуков
+            </button>
           )}
         </section>
 

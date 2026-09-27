@@ -369,10 +369,33 @@ function videoFilter(plan: MediaPlan, hasOverlay: boolean, srcW: number, srcH: n
   return steps.join(";");
 }
 
-function audioFilter(plan: MediaPlan, duration: number): string | null {
+const LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11";
+
+/**
+ * Замер громкости для точного loudnorm. Один проход на коротких звуках промахивался:
+ * орущий мем уходил с −6.6 только до −14 LUFS при цели −16. С замером все ложатся в ±1.
+ * Не вышло (нет звука, тишина) — обычный один проход.
+ */
+async function measuredLoudnorm(plan: MediaPlan, signal?: AbortSignal): Promise<string> {
+  const { err } = await run(tool("ffmpeg"), [
+    "-hide_banner", "-nostats", "-ss", plan.start.toFixed(3), "-to", plan.end.toFixed(3), "-i", plan.input,
+    "-vn", "-map", "0:a:0", "-af", `${LOUDNORM}:print_format=json`, "-f", "null", "-",
+  ], undefined, signal);
+  try {
+    const j = JSON.parse(/\{[^{}]*"input_i"[^{}]*\}/.exec(err)?.[0] ?? "") as Record<string, string>;
+    const vals = [j.input_i, j.input_tp, j.input_lra, j.input_thresh, j.target_offset];
+    if (!vals.every((v) => Number.isFinite(Number(v)))) return LOUDNORM;
+    return `${LOUDNORM}:measured_I=${j.input_i}:measured_TP=${j.input_tp}:measured_LRA=${j.input_lra}` +
+      `:measured_thresh=${j.input_thresh}:offset=${j.target_offset}:linear=true`;
+  } catch {
+    return LOUDNORM;
+  }
+}
+
+function audioFilter(plan: MediaPlan, duration: number, loudnorm = LOUDNORM): string | null {
   const parts: string[] = [];
   if (plan.speed && plan.speed !== 1) parts.push(`atempo=${Math.min(2, Math.max(0.5, plan.speed)).toFixed(3)}`);
-  if (plan.normalize) parts.push("loudnorm=I=-16:TP=-1.5:LRA=11");
+  if (plan.normalize) parts.push(loudnorm);
   if (plan.fadeIn) parts.push("afade=t=in:st=0:d=0.4");
   if (plan.fadeOut) parts.push(`afade=t=out:st=${Math.max(0, duration - 0.5).toFixed(3)}:d=0.5`);
   return parts.length ? parts.join(",") : null;
@@ -413,12 +436,13 @@ export async function transcode(plan: MediaPlan, onProgress?: (p: ProgressInfo) 
     if (r.code === 0) return plan.output;
     // не получилось — молча перекодируем обычным путём
   }
+  const loud = plan.normalize && plan.audio !== "mute" ? await measuredLoudnorm(plan, signal) : undefined;
   const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-progress", "pipe:1"];
   args.push("-ss", plan.start.toFixed(3), "-to", plan.end.toFixed(3), "-i", plan.input);
   if (!onlyAudio && plan.overlayPng) args.push("-i", plan.overlayPng);
 
   if (onlyAudio) {
-    const af = audioFilter(plan, duration);
+    const af = audioFilter(plan, duration, loud);
     args.push("-vn", "-map", "0:a:0");
     if (af) args.push("-af", af);
     args.push("-c:a", "libmp3lame", "-b:a", "192k", "-ar", "44100", "-ac", "2");
@@ -427,7 +451,7 @@ export async function transcode(plan: MediaPlan, onProgress?: (p: ProgressInfo) 
     if (plan.audio === "mute") args.push("-an");
     else {
       args.push("-map", "0:a:0?");
-      const af = audioFilter(plan, duration);
+      const af = audioFilter(plan, duration, loud);
       if (af) args.push("-af", af);
       args.push("-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2");
     }
