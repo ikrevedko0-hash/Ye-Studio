@@ -215,7 +215,8 @@ export function MediaEditor({ media, onClose, onDone }: Props) {
     return canvas.toDataURL("image/png");
   };
 
-  const apply = async () => {
+  // audio — для кнопки «Оставить только звук»: состояние списка обновится только после клика
+  const apply = async (audio = audioMode) => {
     setBusy(true);
     setError("");
     setProgress(0);
@@ -226,7 +227,7 @@ export function MediaEditor({ media, onClose, onDone }: Props) {
         start, end,
         crop: crop ? { x: crop.x, y: crop.y, w: crop.w, h: crop.h } : undefined,
         covers: filters.map((s) => ({ x: s.x, y: s.y, w: s.w, h: s.h, style: s.style as "blur" | "pixelate", from: s.from, to: s.to })),
-        audio: audioMode,
+        audio,
         height: height ? (Number(height) as 720 | 480 | 360) : undefined,
         quality,
         rotate: rotate || undefined,
@@ -421,7 +422,8 @@ export function MediaEditor({ media, onClose, onDone }: Props) {
 
             <div className="apply-box">
               {!isAudio && <button onClick={grabFrame} disabled={busy}>Стоп-кадр в пак</button>}
-              <button className="primary" onClick={apply} disabled={busy || duration < 0.05}>
+              {!isAudio && <button onClick={() => apply("only")} disabled={busy || duration < 0.05}>Оставить только звук</button>}
+              <button className="primary" onClick={() => apply()} disabled={busy || duration < 0.05}>
                 {busy ? `Обработка… ${Math.round(progress * 100)}%` : "Применить"}
               </button>
               {busy && <button onClick={() => window.api.cancelEdit()}>Отмена</button>}
