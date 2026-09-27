@@ -51,7 +51,9 @@ const api: Api = {
   editMedia: (req) => ipcRenderer.invoke("media:edit", req),
   saveImage: (dataUrl, suggestedName) => ipcRenderer.invoke("image:save", dataUrl, suggestedName),
   upscaleReady: () => ipcRenderer.invoke("image:upscaleReady"),
-  upscaleImage: (folder, name, w, h) => ipcRenderer.invoke("image:upscale", folder, name, w, h),
+  upscaleImage: (folder, name, w, h, factor) => ipcRenderer.invoke("image:upscale", folder, name, w, h, factor),
+  upscaleKeep: (token, name, factor) => ipcRenderer.invoke("image:upscaleKeep", token, name, factor),
+  upscaleDrop: (token) => ipcRenderer.invoke("image:upscaleDrop", token),
   mediaBytes: (folder, name) => ipcRenderer.invoke("media:bytes", folder, name),
   cancelEdit: () => ipcRenderer.invoke("media:cancel"),
   // Настройки окна приходят синхронно: они нужны в первом же кадре, до всякой отрисовки.

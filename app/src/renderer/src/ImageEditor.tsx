@@ -9,6 +9,7 @@ import {
 } from "./imageCanvas";
 import { blockGrid, clampBlocks, PIXEL_BLOCKS, PIXEL_PRESETS, revealSteps } from "../../core/media/pixelate";
 import { worthUpscaling } from "../../core/media/upscale";
+import { UpscaleCompare } from "./UpscaleCompare";
 import type { MediaInfo } from "../../shared/api";
 import { fractionIn, useFitBox } from "./fitBox";
 
@@ -51,19 +52,40 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
   const [upscaling, setUpscaling] = useState(false);
   useEffect(() => { void window.api.upscaleReady().then(setUpReady).catch(() => setUpReady(false)); }, []);
 
-  const upscale = async () => {
+  // сначала предпросмотр и сравнение с оригиналом; в пак — только по «Сохранить в пак»
+  const [upPreview, setUpPreview] = useState<{ token: string; url: string; size: number; factor: 2 | 4 } | null>(null);
+  const ipcText = (e: unknown) => (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+  const upscale = async (factor: 2 | 4) => {
     if (!img) return;
     if (upReady === false) { setError("ИИ-увеличение не установлено: «Настройки» → «Компоненты» → «ИИ-увеличение» → «Установить» (~95 МБ)."); return; }
     setBusy(true); setUpscaling(true); setError("");
     try {
-      const created = await window.api.upscaleImage(media.folder, media.name, img.naturalWidth, img.naturalHeight);
-      window.dispatchEvent(new CustomEvent("media-created", { detail: created }));
-      onDone(created);
+      const p = await window.api.upscaleImage(media.folder, media.name, img.naturalWidth, img.naturalHeight, factor);
+      setUpPreview({ ...p, factor });
     } catch (e) {
-      setError((e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""));
+      setError(ipcText(e));
     } finally {
       setBusy(false); setUpscaling(false);
     }
+  };
+  const keepUpscaled = async () => {
+    if (!upPreview) return;
+    setBusy(true);
+    try {
+      const created = await window.api.upscaleKeep(upPreview.token, media.name, upPreview.factor);
+      setUpPreview(null);
+      window.dispatchEvent(new CustomEvent("media-created", { detail: created }));
+      onDone(created);
+    } catch (e) {
+      setError(ipcText(e));
+      setUpPreview(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const dropUpscaled = () => {
+    if (upPreview) void window.api.upscaleDrop(upPreview.token);
+    setUpPreview(null);
   };
 
   const [tool, setTool] = useState<Tool>("move");
@@ -424,16 +446,16 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
             )}
 
             <div className="apply-box">
-              {img && (
-                <button onClick={() => void upscale()} disabled={busy || !worthUpscaling(img.naturalWidth, img.naturalHeight)}
+              {img && ([2, 4] as const).map((f) => (
+                <button key={f} onClick={() => void upscale(f)} disabled={busy || !worthUpscaling(img.naturalWidth, img.naturalHeight)}
                   title={!worthUpscaling(img.naturalWidth, img.naturalHeight)
                     ? "Картинка и так большая — увеличивать незачем"
                     : upReady === false
                       ? "Сначала поставьте «ИИ-увеличение» в «Настройки» → «Компоненты» (~95 МБ)"
-                      : "Увеличить в 4 раза нейросетью Real-ESRGAN (до 1920 px): резче, без выдуманных деталей. Остальные правки не применяются"}>
-                  {upscaling ? "Увеличиваю…" : "Увеличить ×4 (ИИ)"}
+                      : `Увеличить в ${f} раза нейросетью Real-ESRGAN (до 1920 px): резче, без выдуманных деталей. Сначала покажу сравнение — в пак только по вашей кнопке. Остальные правки не применяются`}>
+                  {upscaling ? "Увеличиваю…" : `ИИ ×${f}`}
                 </button>
-              )}
+              ))}
               <button className="primary" onClick={apply} disabled={busy || !img}>{busy && !upscaling ? "Сохраняю…" : "Применить"}</button>
             </div>
             {error && <p className="err">{error}</p>}
@@ -441,6 +463,10 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
           </aside>
         </div>
       </div>
+      {upPreview && img && (
+        <UpscaleCompare before={img.src} after={upPreview.url} afterBytes={upPreview.size} factor={upPreview.factor}
+                        busy={busy} onKeep={() => void keepUpscaled()} onDrop={dropUpscaled} />
+      )}
     </div>
   );
 }

@@ -1011,3 +1011,15 @@ button:has(> .ico), header > b:has(> .ico) { display: inline-flex; align-items: 
 .pe-bar { display: flex; align-items: center; gap: 8px; }
 .pe-problem { color: var(--danger); font-size: 12px; }
 .pe button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+/* ИИ-увеличение: сравнение до/после поверх редактора картинок — UpscaleCompare.tsx */
+.upscale-back { z-index: 60; }
+.upscale-compare { width: min(1200px, 94vw); max-height: 92vh; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
+  background: var(--popover); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+.upscale-compare header, .upscale-compare footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.uc-view { flex: 1; min-height: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; background: #000; border-radius: 8px; }
+.uc-view.real { overflow: auto; justify-content: flex-start; align-items: flex-start; }
+.uc-stage { position: relative; flex: none; }
+.uc-stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; }
+.uc-line { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5); pointer-events: none; }
+.uc-slider { width: 100%; }

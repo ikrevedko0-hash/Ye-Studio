@@ -268,8 +268,12 @@ export interface Api {
   saveImage(dataUrl: string, suggestedName: string): Promise<MediaInfo>;
   /** Стоит ли ИИ-увеличение (модель Real-ESRGAN и sd-cli) — «Компоненты». */
   upscaleReady(): Promise<boolean>;
-  /** ИИ-увеличение ×4 (до 1920 px): новый JPEG в Images, оригинал остаётся. w, h — исходный размер. */
-  upscaleImage(folder: string, name: string, w: number, h: number): Promise<MediaInfo>;
+  /** ИИ-увеличение ×2 или ×4 (до 1920 px) — только предпросмотр, в пак не пишет. w, h — исходный размер. */
+  upscaleImage(folder: string, name: string, w: number, h: number, factor: 2 | 4): Promise<{ token: string; url: string; size: number }>;
+  /** Сохранить предпросмотр в пак новым JPEG рядом с оригиналом (name — имя оригинала). */
+  upscaleKeep(token: string, name: string, factor: 2 | 4): Promise<MediaInfo>;
+  /** Выбросить предпросмотр. */
+  upscaleDrop(token: string): Promise<void>;
   /** Содержимое файла из пака: для canvas, куда siq:// не дотягивается */
   mediaBytes(folder: string, name: string): Promise<{ type: string; data: Uint8Array }>;
   cancelEdit(): Promise<void>;

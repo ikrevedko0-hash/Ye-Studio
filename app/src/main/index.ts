@@ -817,14 +817,33 @@ function registerIpc() {
     return mediaInfo(entry);
   });
 
-  /** ИИ-увеличение (Real-ESRGAN ×4): результат — новым JPEG рядом, оригинал в паке остаётся. */
+  /**
+   * ИИ-увеличение (Real-ESRGAN ×4) в два шага: сначала предпросмотр — автор сравнивает с оригиналом
+   * (у модели бывают мелкие артефакты), и только «Сохранить в пак» кладёт новый JPEG рядом с оригиналом.
+   * Окно получает номер предпросмотра, а не путь: путей из окна главный процесс не принимает.
+   */
+  const upscaled = new Map<string, string>();
   ipcMain.handle("image:upscaleReady", () => upscalerReady());
-  ipcMain.handle("image:upscale", async (_e, folder: string, name: string, w: number, h: number) => {
-    const out = await upscaleImage(await materialize(folder, name), w, h);
-    const outName = uniqueName("Images", `${name.replace(/\.[^.]+$/, "")} (ИИ ×4)${extname(out)}`);
+  ipcMain.handle("image:upscale", async (_e, folder: string, name: string, w: number, h: number, factor: 2 | 4) => {
+    const out = await upscaleImage(await materialize(folder, name), w, h, factor === 2 ? 2 : 4);
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    upscaled.set(token, out);
+    const data = await readFile(out);
+    return { token, url: `data:${MIME[extname(out).toLowerCase()] ?? "image/png"};base64,${data.toString("base64")}`, size: data.length };
+  });
+  ipcMain.handle("image:upscaleKeep", async (_e, token: string, name: string, factor: 2 | 4) => {
+    const out = upscaled.get(token);
+    if (!out || !existsSync(out)) throw new Error("предпросмотр потерялся — увеличьте ещё раз");
+    upscaled.delete(token);
+    const outName = uniqueName("Images", `${name.replace(/\.[^.]+$/, "")} (ИИ ×${factor === 2 ? 2 : 4})${extname(out)}`);
     const entry: MediaEntry = { folder: "Images", name: outName, size: (await stat(out)).size, source: { kind: "file", path: out } };
     doc.media.set(key("Images", outName), entry);
     return mediaInfo(entry);
+  });
+  ipcMain.handle("image:upscaleDrop", async (_e, token: string) => {
+    const out = upscaled.get(token);
+    upscaled.delete(token);
+    if (out) await rm(out, { force: true });
   });
 
   ipcMain.handle("shell:reveal", (_e, path: string) => shell.showItemInFolder(path));

@@ -29,6 +29,10 @@ describe("upscaledSize", () => {
   it("маленькая — ровно ×4", () => {
     expect(upscaledSize(256, 144)).toEqual({ w: 1024, h: 576 });
   });
+  it("×2 — модель даёт ×4, итог ужимается вдвое", () => {
+    expect(upscaledSize(256, 144, 2)).toEqual({ w: 512, h: 288 });
+    expect(upscaledSize(1200, 675, 2)).toEqual({ w: 1920, h: 1080 });
+  });
   it("×4 больше 1920 — ужимается до 1920 по длинной стороне, стороны чётные", () => {
     expect(upscaledSize(800, 451)).toEqual({ w: 1920, h: 1082 });
     expect(upscaledSize(300, 1000)).toEqual({ w: 576, h: 1920 });

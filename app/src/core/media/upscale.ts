@@ -3,8 +3,9 @@
 // в вопросе по-прежнему узнают. Здесь — чистые решения (какой sd-cli, какой итоговый размер);
 // запуск — main/upscale.ts.
 
-/** Модель всегда увеличивает в 4 раза. */
-export const UPSCALE_FACTOR = 4;
+/** Модель всегда увеличивает в 4 раза; ×2 — это ×4 и аккуратное ужатие вдвое (отдельная x2-модель не нужна). */
+export const MODEL_FACTOR = 4;
+export type UpscaleFactor = 2 | 4;
 /** Итог больше этого по длинной стороне не нужен ни SIGame, ни паку: ужимаем обратно. */
 export const UPSCALE_MAX_SIDE = 1920;
 /** С такой длинной стороны увеличивать уже незачем. */
@@ -25,9 +26,9 @@ export function pickCli(opts: { modelBin?: string; upscalerDir: string; exists(p
   return null;
 }
 
-/** Размер после увеличения и ужатия до UPSCALE_MAX_SIDE; чётные стороны — их любит JPEG-кодер. */
-export function upscaledSize(w: number, h: number): { w: number; h: number } {
-  const bw = w * UPSCALE_FACTOR, bh = h * UPSCALE_FACTOR;
+/** Итоговый размер: ×factor, но не больше UPSCALE_MAX_SIDE; чётные стороны — их любит JPEG-кодер. */
+export function upscaledSize(w: number, h: number, factor: UpscaleFactor = 4): { w: number; h: number } {
+  const bw = w * factor, bh = h * factor;
   const k = Math.min(1, UPSCALE_MAX_SIDE / Math.max(bw, bh));
   const even = (n: number) => Math.max(2, Math.round((n * k) / 2) * 2);
   return { w: even(bw), h: even(bh) };

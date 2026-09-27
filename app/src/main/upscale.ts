@@ -7,7 +7,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { ffmpegTools } from "../core/media/ffmpeg";
-import { pickCli, upscaledSize } from "../core/media/upscale";
+import { pickCli, upscaledSize, type UpscaleFactor } from "../core/media/upscale";
 import { componentPath, componentsDir } from "./components";
 
 export const UPSCALER_DIR = "upscaler";
@@ -29,10 +29,10 @@ export async function upscalerReady(): Promise<boolean> {
 }
 
 /**
- * Увеличить картинку в 4 раза и ужать до 1920 по длинной стороне. Возвращает путь к JPEG во временной папке.
+ * Увеличить картинку в 2 или 4 раза (модель всегда ×4, потом ужатие) и не больше 1920 по длинной стороне. Возвращает путь к JPEG во временной папке.
  * w, h — исходный размер (окно его знает, ffprobe ради этого не зовём).
  */
-export async function upscaleImage(input: string, w: number, h: number): Promise<string> {
+export async function upscaleImage(input: string, w: number, h: number, factor: UpscaleFactor = 4): Promise<string> {
   const dir = join(componentsDir(), UPSCALER_DIR);
   const modelFile = join(dir, MODEL);
   if (!existsSync(modelFile)) throw new Error("ИИ-увеличение не установлено: «Настройки» → «Компоненты» → «ИИ-увеличение» → «Установить»");
@@ -60,7 +60,7 @@ export async function upscaleImage(input: string, w: number, h: number): Promise
 
     // без ffmpeg отдаём как есть (PNG ×4); с ним — JPEG нужного размера, пак не распухает
     if (!ff) { tmp.splice(tmp.indexOf(big), 1); return big; }
-    const size = upscaledSize(w, h);
+    const size = upscaledSize(w, h, factor);
     const out = join(tmpdir(), `siq-up-${stamp}.jpg`);
     const s = await run(ff.ffmpeg, ["-y", "-loglevel", "error", "-i", big, "-vf", `scale=${size.w}:${size.h}:flags=lanczos`, "-q:v", "2", out], 60_000);
     if (!s.ok) throw new Error("не удалось сохранить результат: " + s.out.slice(-200));
