@@ -185,6 +185,8 @@ function buildInfo(info: Info | undefined): string {
   if (info.comments !== undefined) s += elem("comments", "", escText(info.comments));
   if (info.showmanComments !== undefined) s += elem("showmanComments", "", escText(info.showmanComments));
   if (info.extension !== undefined) s += elem("extension", "", escText(info.extension));
+  // Пустой <info /> SIGame читает до следующего </info> и теряет весь пак после первой темы.
+  if (s === "") return "";
   return elem("info", "", s);
 }
 
