@@ -494,7 +494,7 @@ export function App() {
           <button className="primary" onClick={actions.newPack}>Новый пак</button>
           <button onClick={actions.open}>Открыть .siq</button>
           <button onClick={actions.components} title="Проверка машины, ffmpeg, yt-dlp и локальная модель картинок"><Icon name="puzzle" />Компоненты</button>
-          <button onClick={actions.assistant} title="Писать вопросы с Claude или ChatGPT: разметка в браузере и вставка в пак"><Icon name="helper" />Помощник</button>
+          <button onClick={actions.assistant} title="Писать вопросы с Claude или ChatGPT: разметка в браузере и вставка в пак"><Icon name="helper" />ИИ-помощник Claude/ChatGPT</button>
         </div>
         {draft && (
           <div className="draft-banner">

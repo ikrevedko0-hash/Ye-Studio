@@ -47,14 +47,14 @@ function Ribbon({ section, path, actions }: { section: Section | null; path?: st
         </button>
       </>)}
       {part("ai", <>
-        <button className="k-ai" onClick={actions.assistant} title="Помощник: настроить Claude или ChatGPT для тем и вопросов"><Icon name="helper" />Помощник</button>
+        <button className="k-ai" onClick={actions.assistant} title="Помощник: настроить Claude или ChatGPT для тем и вопросов"><Icon name="helper" />ИИ-помощник Claude/ChatGPT</button>
         <button className="k-set" onClick={actions.aiSettings} title="Сервисы ИИ: ключи, модели, очереди, остатки лимитов"><Icon name="gear" />Настройка ИИ-компонентов</button>
         <button className="k-set" onClick={actions.components} title="Компоненты: проверка машины и локальная модель картинок одной кнопкой"><Icon name="puzzle" />Компоненты</button>
       </>)}
       {part("out", <>
         {/* подсказка начинается с «Проверить пак» — по ней кнопку находит самопроверка */}
         <button className="k-check" onClick={actions.check} title="Проверить пак: повторы на FirePacks, а заодно пустые вопросы, ответы, файлы, объём">
-          <Icon name="check" />Проверка на повторы
+          <Icon name="check" />Автопроверка пака
         </button>
         <button className="k-pub" onClick={actions.publish} title="Афиша со всеми темами и готовый текст поста для ВКонтакте"><Icon name="megaphone" />Публикация</button>
       </>)}
