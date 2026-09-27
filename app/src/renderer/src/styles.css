@@ -404,7 +404,9 @@ label.check input { width: auto; }
 label.check.inline { flex-direction: row; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 4px 0; }
 label.check.inline input { width: auto; }
 .shape-props { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-top: 6px; }
-.apply-box { display: flex; gap: 8px; margin-top: 18px; }
+/* три кнопки в узкую колонку не влезают: переносятся целиком, а не ломают подписи на три строки */
+.apply-box { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.apply-box button { white-space: nowrap; }
 .progress { height: 6px; background: var(--panel-2); border-radius: 3px; margin-top: 8px; overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--accent); }
 .err { color: var(--danger); font-size: 12px; }
