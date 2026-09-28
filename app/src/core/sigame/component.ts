@@ -9,22 +9,22 @@ export const SIGAME_COMPONENT: Pick<Manifest, "files" | "tools"> | null = {
   "files": {
     "sigame-runner": {
       "title": "Движок SIGame 7.13.12 (стенд прогона)",
-      "url": "https://github.com/ikrevedko0-hash/Ye-Studio/releases/download/sigame-7.13.12-c94254f-r2/sigame-runner-win-x64.zip",
-      "size": 45069561,
-      "sha256": "5eb8e5fdaca7509ebcc5ed6f29a19f9dcabfff7c120f338e3c95d02189f5f2d6",
+      "url": "https://github.com/ikrevedko0-hash/Ye-Studio/releases/download/sigame-7.13.12-c94254f-r3/sigame-runner-win-x64.zip",
+      "size": 45069538,
+      "sha256": "c6ee4a22dccf7399ec122edbffb347ea91143b95a6edfc31765e5fcdcf008ef0",
       "unzipTo": "sigame/runner"
     },
     "sigame-table": {
       "title": "Стол SIOnline (экран игрока)",
-      "url": "https://github.com/ikrevedko0-hash/Ye-Studio/releases/download/sigame-7.13.12-c94254f-r2/sigame-table.zip",
+      "url": "https://github.com/ikrevedko0-hash/Ye-Studio/releases/download/sigame-7.13.12-c94254f-r3/sigame-table.zip",
       "size": 2359102,
-      "sha256": "6fed2c2c229ba74c06ad38db2700544bf971bb4f98fb0170c6b94c6243829030",
+      "sha256": "bafe3f69bef1807bdf5056acf09fe76beb2e241f9551bf8708dde57832ee1739",
       "unzipTo": "sigame/table"
     }
   },
   "tools": {
     "sigame": {
-      "version": "7.13.12 / c94254f / r2",
+      "version": "7.13.12 / c94254f / r3",
       "files": [
         "sigame-runner",
         "sigame-table"

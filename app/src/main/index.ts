@@ -1,6 +1,7 @@
 // Главный процесс: окно, работа с файлами паков, медиа для предпросмотра.
 
 import { createHash } from "node:crypto";
+import { optionsTextToReplic } from "../core/siq/optionsLayout";
 import { existsSync, statSync } from "node:fs";
 import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -568,6 +569,8 @@ async function savePack(pkg: Package, saveAs: boolean, forcedTarget?: string): P
     pkg.files = kept;
   }
 
+  // вопросы с вариантами и картинкой: текст — репликой ведущего, иначе SIOnline отдаст кнопкам две трети экрана
+  optionsTextToReplic(pkg);
   const tmp = `${target}.tmp-${Date.now()}`;
   await writeSiq(tmp, pkg, docEntries());
   if (doc.reader && doc.path?.toLowerCase() === target.toLowerCase()) doc.reader.close();

@@ -48,6 +48,7 @@ export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onS
           <button className="icon" onClick={onClose} title="Закрыть">×</button>
         </header>
         {issues.length === 0 && <p className="pc-empty">Всё чисто — можно играть и выкладывать.</p>}
+
         <ul className="pc-list">
           {issues.map((i, k) => (
             <li key={k} className={`pc-${i.level}`}>

@@ -6,7 +6,7 @@ import type { CheckIssue } from "../siq/check";
 import type { FetchedMedia, LostPart, MissingRef, PackShape, RoundEvent } from "./protocol";
 import type { Screen } from "./screens";
 
-export type ProfileId = "phone" | "phoneLand" | "pc";
+export type ProfileId = "phone" | "pc";
 
 export interface Profile {
   id: ProfileId;
@@ -15,14 +15,11 @@ export interface Profile {
   height: number;
   scale: number;
   mobile: boolean;
-  /** Эмуляция сети: задержка, мс, и скорость приёма, байт/с. Нет — без ограничений. */
-  network?: { latencyMs: number; downBytesPerSec: number };
 }
 
 export const PROFILES: Profile[] = [
-  // мобильный 4G: 12 Мбит/с и 70 мс — обычная скорость у игроков, не худший случай
-  { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 70, downBytesPerSec: 1_500_000 } },
-  { id: "phoneLand", title: "Телефон лёжа", width: 844, height: 390, scale: 3, mobile: true },
+  // два экрана — так играют почти все; телефон лёжа и медленную сеть не снимаем: вдвое дольше, а пользы мало
+  { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true },
   { id: "pc", title: "Компьютер", width: 1920, height: 1080, scale: 1, mobile: false },
 ];
 
@@ -33,8 +30,6 @@ export const SIGAME_LIMITS = {
   phoneMinSide: 140,
   /** …или занимает меньше такой доли экрана. */
   phoneMinShare: 0.06,
-  /** Загрузка на мобильной сети (профиль phone) дольше — игроки ждут. */
-  slowLoadMs: 5000,
   /** Больше стольких мегапикселей iPhone может отказаться показывать картинку. */
   iosMaxMegapixels: 16.7,
   /** Шрифт вариантов мельче — читать тяжело. */
@@ -161,8 +156,6 @@ export function shotIssues(s: Shot, profile: Profile, names: Record<string, stri
       if (side < L.phoneMinSide || share < L.phoneMinShare)
         add("small", name, "warn", `Картинка ${name} на телефоне всего ${img.rect.w}×${img.rect.h} (${Math.round(share * 100)}% экрана)`, 1 / Math.max(share, 0.001));
     }
-    if (profile.network && img.timing && img.timing.ms > L.slowLoadMs)
-      add("slow", name, "warn", `Картинка ${name} грузится на мобильной сети ${(img.timing.ms / 1000).toFixed(1)} с`, img.timing.ms);
   }
 
   for (const v of m.videos) {
@@ -172,8 +165,6 @@ export function shotIssues(s: Shot, profile: Profile, names: Record<string, stri
     // Stryker disable next-line StringLiteral: pop() у split всегда что-то даёт
     const ext = name.toLowerCase().split(".").pop() ?? "";
     if (profile.mobile && IOS_BAD_VIDEO.has(ext)) add("iosVideo", name, "warn", `Видео ${name}: Safari на iPhone .${ext} не играет — надёжнее mp4 (H.264)`, 1, "rules");
-    if (profile.network && v.timing && v.timing.ms > L.slowLoadMs * 2)
-      add("slow", name, "warn", `Видео ${name} грузится на мобильной сети ${(v.timing.ms / 1000).toFixed(1)} с`, v.timing.ms);
   }
 
   if (m.options.length) {

@@ -6,8 +6,8 @@ import { engineProgress, parseRunnerLine, type RecordedMessage, type RoundEvent 
 import { buildReport, IOS_BAD_VIDEO, mergeShotIssues, PROFILES, shotIssues, type Shot, type TableMeasure } from "../src/core/sigame/report";
 import { MAX_SCREENS_PER_PART, questionScreens } from "../src/core/sigame/screens";
 
-const phone = PROFILES[0];
-const pc = PROFILES[2];
+const phone = PROFILES.find((p) => p.id === "phone")!;
+const pc = PROFILES.find((p) => p.id === "pc")!;
 const msgs = (...texts: string[]): RecordedMessage[] => texts.map((t, i) => [i * 10, t.replace(/\|/g, "\n")]);
 
 function measure(over: Partial<TableMeasure> = {}): TableMeasure {
@@ -33,8 +33,7 @@ const issue = (rule: string, subject: string, level: "error" | "warn", text: str
 describe("профили и списки", () => {
   it("экраны прогона — как у игроков", () => {
     expect(PROFILES).toEqual([
-      { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 70, downBytesPerSec: 1_500_000 } },
-      { id: "phoneLand", title: "Телефон лёжа", width: 844, height: 390, scale: 3, mobile: true },
+      { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true },
       { id: "pc", title: "Компьютер", width: 1920, height: 1080, scale: 1, mobile: false },
     ]);
     expect([...IOS_BAD_VIDEO]).toEqual(["webm", "mkv", "avi", "flv", "wmv", "ogv"]);
@@ -140,20 +139,10 @@ describe("правила снимка: точные тексты", () => {
     expect(shotIssues(shot(notFill), phone).map((i) => i.rule)).toEqual(["small"]);
   });
 
-  it("медленная картинка", () => {
-    expect(shotIssues(shot(measure({ images: [img([800, 600], [362, 272], { timing: { ms: 6500, bytes: 1 } })] })), phone)).toEqual([
-      issue("slow", "ABC.png", "warn", "Картинка ABC.png грузится на мобильной сети 6.5 с", 6500),
-    ]);
-  });
-
-  it("видео: кодек, прочие ошибки, медленная загрузка с порогом вдвое больше", () => {
+  it("видео: кодек, прочие ошибки; долгая загрузка — не беда", () => {
     expect(shotIssues(shot(measure({ videos: [video({ error: 4 })] })), phone)).toEqual([issue("codec", "V.mp4", "error", "Видео V.mp4 браузер не играет (кодек или формат)")]);
     expect(shotIssues(shot(measure({ videos: [video({ error: 3 })] })), phone)).toEqual([issue("video", "V.mp4", "error", "Видео V.mp4: ошибка воспроизведения 3")]);
-    expect(shotIssues(shot(measure({ videos: [video({ timing: { ms: 6000, bytes: 1 } })] })), phone)).toEqual([]);
-    expect(shotIssues(shot(measure({ videos: [video({ timing: { ms: 10000, bytes: 1 } })] })), phone)).toEqual([]);
-    expect(shotIssues(shot(measure({ videos: [video({ timing: { ms: 10001, bytes: 1 } })] })), phone)).toEqual([
-      issue("slow", "V.mp4", "warn", "Видео V.mp4 грузится на мобильной сети 10.0 с", 10001),
-    ]);
+    expect(shotIssues(shot(measure({ videos: [video({ timing: { ms: 60000, bytes: 1 } })] })), phone)).toEqual([]);
     expect(shotIssues(shot(measure({ videos: [video({ timing: { ms: 60000, bytes: 1 } })] }), pc.id), pc)).toEqual([]);
   });
 
@@ -187,8 +176,8 @@ describe("правила снимка: точные тексты", () => {
 
   it("слияние: при равной тяжести остаётся первый текст", () => {
     const base = { rule: "r", subject: "s", level: "warn" as const, score: 2, source: "table" as const };
-    const r = mergeShotIssues({ round: 0 }, [{ issue: { ...base, text: "первый" }, profile: "pc" }, { issue: { ...base, text: "второй" }, profile: "phoneLand" }]);
-    expect(r.map((i) => [i.text, i.profiles])).toEqual([["первый — экраны: «Телефон лёжа», «Компьютер»", ["phoneLand", "pc"]]]);
+    const r = mergeShotIssues({ round: 0 }, [{ issue: { ...base, text: "первый" }, profile: "pc" }, { issue: { ...base, text: "второй" }, profile: "phone" }]);
+    expect(r.map((i) => [i.text, i.profiles])).toEqual([["первый — экраны: «Телефон», «Компьютер»", ["phone", "pc"]]]);
   });
 });
 
@@ -266,10 +255,10 @@ describe("отчёт: точные записи", () => {
       ({ round, screen: { question, at: 0, part, n }, profile, measure: measure(), settle: { waitedMs: 0, stillLoading: 0 }, file: `${round}${question}${profile}${part}${n}` });
     const r = buildReport({
       open: { ok: true, file: shape }, missing: [], rounds: [r1, r0],
-      shots: [s(1, 0, "pc", "question", 1), s(0, 0, "pc", "answer", 1), s(0, 0, "pc", "question", 2), s(0, 0, "phone", "question", 1), s(0, 0, "pc", "question", 1), s(0, 0, "phoneLand", "question", 1), s(7, 0, "pc", "question", 1)],
+      shots: [s(1, 0, "pc", "question", 1), s(0, 0, "pc", "answer", 1), s(0, 0, "pc", "question", 2), s(0, 0, "phone", "question", 1), s(0, 0, "pc", "question", 1), s(0, 0, "tablet" as Shot["profile"], "question", 1), s(7, 0, "pc", "question", 1)],
     }, [phone, pc]);
     expect(r.questions.map((q) => [q.at.round, q.at.theme, q.at.question])).toEqual([[0, 0, 0], [0, 0, 1], [0, 1, 0], [1, 0, 0]]);
-    expect(r.questions[2].shots.map((x) => x.file)).toEqual(["00phonequestion1", "00pcquestion1", "00pcquestion2", "00pcanswer1", "00phoneLandquestion1"]);
+    expect(r.questions[2].shots.map((x) => x.file)).toEqual(["00phonequestion1", "00pcquestion1", "00pcquestion2", "00pcanswer1", "00tabletquestion1"]);
     expect(r.questions[3].shots.map((x) => x.file)).toEqual(["10pcquestion1"]);
     expect(r.questions[0].shots).toEqual([]);
   });

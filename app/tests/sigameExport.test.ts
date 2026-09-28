@@ -6,14 +6,14 @@ import type { QuestionReport, SigameReport } from "../src/core/sigame/report";
 const at = (question: number) => ({ round: 0, theme: 1, question });
 const q = (question: number, issues: QuestionReport["issues"]): QuestionReport => ({
   at: at(question), type: "simple", issues,
-  shots: (["phone", "phoneLand", "pc"] as const).map((profile) => ({ profile, part: "question" as const, n: 1, file: `q${question}-${profile}.jpg` })),
+  shots: (["phone", "pc"] as const).map((profile) => ({ profile, part: "question" as const, n: 1, file: `q${question}-${profile}.jpg` })),
 });
 const warn = (text: string, profiles: QuestionReport["issues"][0]["profiles"], question = 0) => ({ level: "warn" as const, text, at: at(question), profiles, source: "table" as const });
 
 describe("сохранение отчёта", () => {
   it("снимки — только экраны, где видна беда; беда без экрана — все снимки", () => {
-    expect(shotsToExport(q(0, [warn("мелко", ["phoneLand"])])).map((s) => s.profile)).toEqual(["phoneLand"]);
-    expect(shotsToExport(q(0, [{ ...warn("нет файла", []), level: "error", source: "engine" }])).map((s) => s.profile)).toEqual(["phone", "phoneLand", "pc"]);
+    expect(shotsToExport(q(0, [warn("мелко", ["phone"])])).map((s) => s.profile)).toEqual(["phone"]);
+    expect(shotsToExport(q(0, [{ ...warn("нет файла", []), level: "error", source: "engine" }])).map((s) => s.profile)).toEqual(["phone", "pc"]);
   });
 
   it("в файле — только вопросы с бедами, подписи мест, экранированный текст и полный JSON, который не рвёт script", () => {

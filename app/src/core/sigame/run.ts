@@ -58,7 +58,6 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
   await mkdir(o.outDir, { recursive: true });
 
   // ---------- 1. движок ----------
-  progress({ stage: "engine", done: 0, total: 0, text: "SIGame открывает пак и играет его" });
   const child = spawn(o.runner, [o.pack], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
   const kill = () => { try { child.stdin.end(); } catch { /* уже закрыт */ } setTimeout(() => child.kill(), 3000).unref(); };
   o.signal?.addEventListener("abort", kill, { once: true });
@@ -66,6 +65,29 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
   child.stderr.on("data", (d: Buffer) => { stderr = (stderr + d.toString("utf8")).slice(-4000); });
 
   const input: ReportInput = { missing: [], rounds: [], shots: [] };
+  // ---------- 2. стол SIOnline — параллельно с игрой: каждый сыгранный раунд сразу снимается ----------
+  const queues = new Map(profiles.map((p) => [p.id, [] as { r: RoundEvent; screens: ReturnType<typeof roundScreens> }[]]));
+  let waiters: (() => void)[] = [];
+  const wake = () => { const w = waiters; waiters = []; for (const f of w) f(); };
+  let engineDone = false;
+  /** Движок сорвался — окна дальше не снимают. */
+  let failed = false;
+  let engineText = { done: 0, total: 0, text: "SIGame открывает пак и играет его" };
+  let shotsDone = 0, shotsTotal = 0;
+  const emit = () => {
+    if (!engineDone) progress({ stage: "engine", ...engineText, text: engineText.text + (shotsTotal ? ` · снято экранов ${shotsDone} из ${shotsTotal}` : "") });
+    else progress({ stage: "table", done: shotsDone, total: shotsTotal, text: `Экраны: ${shotsDone} из ${shotsTotal}` });
+  };
+  const tick = () => { shotsDone++; emit(); };
+  const windows = profiles.flatMap((profile) => Array.from({ length: Math.max(1, o.windows ?? WINDOWS_PER_PROFILE) }, async () => {
+    const queue = queues.get(profile.id)!;
+    while (!o.signal?.aborted && !failed) {
+      const next = queue.shift();
+      if (next) input.shots.push(...await renderRound(o, profile, next.r, next.screens, tick));
+      else if (engineDone) return;
+      else await new Promise<void>((res) => waiters.push(res));
+    }
+  }));
   /** Ход раундов для окна (события progress стенда; старый стенд их не шлёт — тогда только «сыгран раунд»). */
   const playing = new Map<number, { name: string; question: number; ended: number; total: number; done?: boolean }>();
   const finished = new Promise<void>((resolve, reject) => {
@@ -89,14 +111,23 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
       case "refs": input.missing = e.missing; break;
       case "progress":
         playing.set(e.round, { ...playing.get(e.round), name: e.name, question: e.question, ended: e.ended, total: e.total });
-        progress({ stage: "engine", ...engineProgress(playing) });
+        engineText = engineProgress(playing);
+        emit();
         break;
       case "round": {
         input.rounds.push(e);
         const was = playing.get(e.round);
         playing.set(e.round, { name: e.name, question: e.played, ended: e.played, total: was?.total ?? e.questions.length, done: true });
         const p = engineProgress(playing);
-        progress({ stage: "engine", ...p, text: was ? p.text : `Сыгран раунд «${e.name}»: вопросов ${e.played}` });
+        engineText = was ? p : { ...p, text: `Сыгран раунд «${e.name}»: вопросов ${e.played}` };
+        // раунд сыгран — сразу на стол, не дожидаясь остальных
+        const screens = roundScreens(e.messages, e.questions);
+        if (screens.length) {
+          shotsTotal += screens.length * profiles.length;
+          for (const q of queues.values()) q.push({ r: e, screens });
+          wake();
+        }
+        emit();
         break;
       }
       case "done": input.done = e; break;
@@ -104,28 +135,26 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
   }
 
   try {
-    await finished;
-    if (o.signal?.aborted) throw new Error("прогон отменён");
-
-    // ---------- 2. стол SIOnline ----------
-    const rounds = input.rounds.sort((a, b) => a.round - b.round);
-    const perRound = rounds.map((r) => ({ r, screens: roundScreens(r.messages, r.questions) }));
-    const total = perRound.reduce((s, x) => s + x.screens.length, 0) * profiles.length;
-    let done = 0;
-    const tick = () => { done++; progress({ stage: "table", done, total, text: `Экраны: ${done} из ${total}` }); };
-    // по каждому профилю — несколько окон; каждое берёт следующий ещё не снятый раунд
-    await Promise.all(profiles.flatMap((profile) => {
-      const queue = perRound.filter((x) => x.screens.length);
-      return Array.from({ length: Math.max(1, Math.min(o.windows ?? WINDOWS_PER_PROFILE, queue.length)) }, async () => {
-        for (let next = queue.shift(); next && !o.signal?.aborted; next = queue.shift()) {
-          input.shots.push(...await renderRound(o, profile, next.r, next.screens, tick));
-        }
-      });
-    }));
+    try {
+      await finished;
+    } catch (e) {
+      failed = true;
+      throw e;
+    } finally {
+      // игра кончилась (или сорвалась): окна доснимают очередь и закрываются
+      engineDone = true;
+      wake();
+    }
+    emit();
+    await Promise.all(windows);
     if (o.signal?.aborted) throw new Error("прогон отменён");
   } finally {
+    engineDone = true;
+    wake();
+    await Promise.allSettled(windows);
     kill();
   }
+  input.rounds.sort((a, b) => a.round - b.round);
 
   const report = buildReport(input, profiles);
   progress({ stage: "done", done: 1, total: 1, text: "Готово" });

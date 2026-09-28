@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { findOptionsSqueeze } from "../../core/siq/optionsLayout";
 import { History } from "../../core/history";
 import { flushSync } from "react-dom";
 import { appendTheme, isSortedByPrice, moveQuestion, moveQuestionTo, moveTheme, reorderTheme, sortThemeByPrice, type Relocate, type Slot } from "../../core/siq/board";
@@ -448,13 +449,15 @@ export function App() {
         // время по умолчанию мастерской (10 с показ, 40 с «найди», 10 с кнопка) — туда, где своего нет
         const pkg = structuredClone(pack.pkg);
         const timed = applyTimeDefaults(pkg);
+        // текст рядом с картинкой в вопросах с вариантами main сделает репликой ведущего (core/siq/optionsLayout.ts)
+        const replic = findOptionsSqueeze(pkg).length;
         const saved = await window.api.savePack(pkg, saveAs);
         if (saved) {
           // после сохранения pkg — новый объект с тем же содержимым: это не правка, историю не пишем
           pkgChange.current = "skip";
           setPack(saved);
           setDirty(false);
-          setStatus(`Сохранено: ${saved.path}${timed ? ` · время по умолчанию проставлено в ${timed} вопр.` : ""}`);
+          setStatus(`Сохранено: ${saved.path}${timed ? ` · время по умолчанию проставлено в ${timed} вопр.` : ""}${replic ? ` · текст вопросов с вариантами и картинкой — репликой ведущего: ${replic}` : ""}`);
           return saved.path;
         } else setStatus("");
       } catch (e) {

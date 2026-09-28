@@ -139,14 +139,11 @@ describe("правила по снимку стола", () => {
     expect(r.map((i) => i.rule)).toEqual(["pending"]);
   });
 
-  it("кодек видео, медленная сеть — только на профиле с сетью", () => {
-    const video = { src: "http://h/package/Video/V.mp4", readyState: 0, error: 4, natural: { w: 0, h: 0 }, rect: { x: 0, y: 0, w: 300, h: 200 }, timing: { ms: SIGAME_LIMITS.slowLoadMs * 2 + 1, bytes: 1 } };
-    expect(shotIssues(shot(measure({ videos: [video] })), phone).map((i) => i.rule)).toEqual(["codec", "slow"]);
+  it("кодек видео — на всех экранах; время загрузки само по себе не беда (сеть не имитируется)", () => {
+    const video = { src: "http://h/package/Video/V.mp4", readyState: 0, error: 4, natural: { w: 0, h: 0 }, rect: { x: 0, y: 0, w: 300, h: 200 }, timing: { ms: 60000, bytes: 1 } };
+    expect(shotIssues(shot(measure({ videos: [video] })), phone).map((i) => i.rule)).toEqual(["codec"]);
     expect(shotIssues(shot(measure({ videos: [video] }), pc.id), pc).map((i) => i.rule)).toEqual(["codec"]);
-    const slowImg = img([800, 600], [362, 272], { timing: { ms: SIGAME_LIMITS.slowLoadMs + 1, bytes: 1 } });
-    expect(shotIssues(shot(measure({ images: [slowImg] })), phone).map((i) => i.rule)).toEqual(["slow"]);
-    const okImg = img([800, 600], [362, 272], { timing: { ms: SIGAME_LIMITS.slowLoadMs, bytes: 1 } });
-    expect(shotIssues(shot(measure({ images: [okImg] })), phone)).toEqual([]);
+    expect(shotIssues(shot(measure({ images: [img([800, 600], [362, 272], { timing: { ms: 60000, bytes: 1 } })] })), phone)).toEqual([]);
   });
 
   it("webm и прочие контейнеры — по правилам для iPhone, только на телефоне", () => {

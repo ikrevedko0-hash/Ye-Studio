@@ -115,7 +115,6 @@ export function SigameRun({ pack, state, onStart, onCancel, onGo, onComponents, 
         <p className="pc-note">
           Пак играется настоящим движком SIGame — каждый вопрос, со спецвопросами и финалом, — а игроки видят его
           настоящим столом SIOnline (браузер и телефон) на экранах: {PROFILES.map((p) => `«${p.title}»`).join(", ")}.
-          Телефон — ещё и на медленной мобильной сети.
         </p>
 
         {ready === false && !report && (
