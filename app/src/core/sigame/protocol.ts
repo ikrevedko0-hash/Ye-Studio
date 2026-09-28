@@ -65,9 +65,11 @@ const TYPES = new Set(["start", "open", "refs", "round", "done"]);
 /** Строка stdout стенда → событие; посторонние строки (логи .NET) — null. */
 export function parseRunnerLine(line: string): RunnerEvent | null {
   const s = line.trim();
+  // Stryker disable next-line ConditionalExpression,StringLiteral: быстрый отсев; не-объекты отсекает и проверка ниже
   if (!s.startsWith("{")) return null;
   try {
     const e = JSON.parse(s) as RunnerEvent;
+    // Stryker disable next-line ConditionalExpression,LogicalOperator: строка начинается с «{» — JSON.parse даёт объект или бросает
     return e && typeof e === "object" && TYPES.has(e.type) ? e : null;
   } catch {
     return null;

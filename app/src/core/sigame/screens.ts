@@ -18,10 +18,12 @@ const ANSWER_START = /^(RIGHT_ANSWER_START|RIGHTANSWER)(\n|$)/;
 /** Больше экранов на вопрос не снимаем: у поочерёдного текста их могут быть десятки. */
 export const MAX_SCREENS_PER_PART = 4;
 
+// Stryker disable next-line StringLiteral: любая строка не из CONTENT… ведёт себя так же
 const text = (m: RecordedMessage | undefined) => (m ? m[1] : "");
 
 export function questionScreens(messages: RecordedMessage[], q: QuestionMark, index: number): Screen[] {
   if (q.start < 0) return [];
+  // Stryker disable next-line ArithmeticOperator: за концом записи сообщений нет — лишние шаги цикла ничего не снимают
   const end = q.end >= 0 ? q.end : messages.length - 1;
   const out: Screen[] = [];
   let part: Screen["part"] = "question";
@@ -31,6 +33,7 @@ export function questionScreens(messages: RecordedMessage[], q: QuestionMark, in
     const s: Screen = { question: index, at, part, n: count[part] };
     const same = out.filter((o) => o.part === part);
     // лишние экраны части: оставляем первые и последний — последний заменяет предыдущий «последний»
+    // Stryker disable next-line ArithmeticOperator: последний экран части всегда последний в out — splice(-1) удаляет его же
     if (same.length >= MAX_SCREENS_PER_PART) out.splice(out.indexOf(same[same.length - 1]), 1);
     out.push(s);
   };

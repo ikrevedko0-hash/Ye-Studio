@@ -168,6 +168,7 @@ export function shotIssues(s: Shot, profile: Profile, names: Record<string, stri
     const name = nameOf(v.src);
     if (v.error === 4) add("codec", name, "error", `Видео ${name} браузер не играет (кодек или формат)`);
     else if (v.error) add("video", name, "error", `Видео ${name}: ошибка воспроизведения ${v.error}`);
+    // Stryker disable next-line StringLiteral: pop() у split всегда что-то даёт
     const ext = name.toLowerCase().split(".").pop() ?? "";
     if (profile.mobile && IOS_BAD_VIDEO.has(ext)) add("iosVideo", name, "warn", `Видео ${name}: Safari на iPhone .${ext} не играет — надёжнее mp4 (H.264)`, 1, "rules");
     if (profile.network && v.timing && v.timing.ms > L.slowLoadMs * 2)
@@ -176,7 +177,7 @@ export function shotIssues(s: Shot, profile: Profile, names: Record<string, stri
 
   if (m.options.length) {
     const main = m.images.filter((i) => !i.inOption).sort((a, b) => b.rect.w * b.rect.h - a.rect.w * a.rect.h)[0];
-    if (main && m.optionsArea && m.optionsArea.h > 0) {
+    if (main && m.optionsArea) {
       const ratio = (m.optionsArea.w * m.optionsArea.h) / Math.max(1, main.rect.w * main.rect.h);
       if (ratio > 1.5) add("options", "", "warn", `Кнопки ответов занимают в ${ratio.toFixed(1)} раза больше места, чем картинка (${main.rect.w}×${main.rect.h})`, ratio);
     }

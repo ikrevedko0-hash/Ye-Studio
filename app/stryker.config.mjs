@@ -27,7 +27,8 @@ export default {
   reporters: ["html", "clear-text", "progress", "json"],
   htmlReporter: { fileName: "reports/mutation/index.html" },
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
-  thresholds: { high: 90, low: 80, break: null },
+  // первый полный прогон: 96% (core/siq 89–100%, core/sigame 99–100%); ниже 90 — тесты заметно ослабли
+  thresholds: { high: 90, low: 80, break: 90 },
   concurrency: 4,
   timeoutMS: 20000,
   tempDirName: ".stryker-tmp",
