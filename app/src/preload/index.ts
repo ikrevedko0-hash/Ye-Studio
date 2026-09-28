@@ -15,6 +15,7 @@ const api: Api = {
   sigameRunReady: () => ipcRenderer.invoke("sigame:runReady"),
   sigameRun: (packPath) => ipcRenderer.invoke("sigame:run", packPath),
   sigameRunCancel: () => ipcRenderer.invoke("sigame:runCancel"),
+  sigameExport: (run, title, labels) => ipcRenderer.invoke("sigame:export", run, title, labels),
   onSigameProgress: (cb) => {
     const h = (_e: unknown, p: Parameters<typeof cb>[0]) => cb(p);
     ipcRenderer.on("sigame:progress", h);

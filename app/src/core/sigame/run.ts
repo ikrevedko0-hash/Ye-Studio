@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { parseRunnerLine, type RecordedMessage, type RoundEvent, type RunnerEvent } from "./protocol";
+import { engineProgress, parseRunnerLine, type RecordedMessage, type RoundEvent, type RunnerEvent } from "./protocol";
 import { buildReport, PROFILES, type Profile, type ReportInput, type Shot, type SigameReport, type TableMeasure } from "./report";
 import { roundScreens } from "./screens";
 
@@ -37,12 +37,18 @@ export interface SigameRunOptions {
   browser: TableBrowser;
   outDir: string;
   profiles?: Profile[];
-  /** Сколько экранов снимать одновременно (по профилям). */
   onProgress?: (p: SigameProgress) => void;
   signal?: AbortSignal;
-  /** Сколько ждать загрузки медиа на экране, мс. */
+  /** Сколько ждать загрузки медиа на экране, мс. Долгая загрузка всё равно попадает в отчёт — по её времени. */
   mediaWaitMs?: number;
+  /** Сколько окон на экран (профиль) снимают раунды одновременно. */
+  windows?: number;
 }
+
+/** Предел ожидания медиа на одном снимке по умолчанию, мс. */
+export const MEDIA_WAIT_MS = 8000;
+/** Окон на профиль по умолчанию: раунды снимаются параллельно — экраны телефона не ждут друг друга. */
+export const WINDOWS_PER_PROFILE = 2;
 
 const toFeed = (list: RecordedMessage[]) => list.map(([, text, sender, isSystem]) => ({ text, sender, isSystem }));
 
@@ -60,6 +66,8 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
   child.stderr.on("data", (d: Buffer) => { stderr = (stderr + d.toString("utf8")).slice(-4000); });
 
   const input: ReportInput = { missing: [], rounds: [], shots: [] };
+  /** Ход раундов для окна (события progress стенда; старый стенд их не шлёт — тогда только «сыгран раунд»). */
+  const playing = new Map<number, { name: string; question: number; ended: number; total: number; done?: boolean }>();
   const finished = new Promise<void>((resolve, reject) => {
     const rl = createInterface({ input: child.stdout });
     rl.on("line", (line) => {
@@ -79,10 +87,18 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
     switch (e.type) {
       case "open": input.open = e; break;
       case "refs": input.missing = e.missing; break;
-      case "round":
-        input.rounds.push(e);
-        progress({ stage: "engine", done: input.rounds.length, total: 0, text: `Сыгран раунд «${e.name}»: вопросов ${e.played}` });
+      case "progress":
+        playing.set(e.round, { ...playing.get(e.round), name: e.name, question: e.question, ended: e.ended, total: e.total });
+        progress({ stage: "engine", ...engineProgress(playing) });
         break;
+      case "round": {
+        input.rounds.push(e);
+        const was = playing.get(e.round);
+        playing.set(e.round, { name: e.name, question: e.played, ended: e.played, total: was?.total ?? e.questions.length, done: true });
+        const p = engineProgress(playing);
+        progress({ stage: "engine", ...p, text: was ? p.text : `Сыгран раунд «${e.name}»: вопросов ${e.played}` });
+        break;
+      }
       case "done": input.done = e; break;
     }
   }
@@ -96,15 +112,15 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
     const perRound = rounds.map((r) => ({ r, screens: roundScreens(r.messages, r.questions) }));
     const total = perRound.reduce((s, x) => s + x.screens.length, 0) * profiles.length;
     let done = 0;
-    await Promise.all(profiles.map(async (profile) => {
-      for (const { r, screens } of perRound) {
-        if (o.signal?.aborted) return;
-        const shots = await renderRound(o, profile, r, screens, () => {
-          done++;
-          progress({ stage: "table", done, total, text: `Экраны: ${done} из ${total}` });
-        });
-        input.shots.push(...shots);
-      }
+    const tick = () => { done++; progress({ stage: "table", done, total, text: `Экраны: ${done} из ${total}` }); };
+    // по каждому профилю — несколько окон; каждое берёт следующий ещё не снятый раунд
+    await Promise.all(profiles.flatMap((profile) => {
+      const queue = perRound.filter((x) => x.screens.length);
+      return Array.from({ length: Math.max(1, Math.min(o.windows ?? WINDOWS_PER_PROFILE, queue.length)) }, async () => {
+        for (let next = queue.shift(); next && !o.signal?.aborted; next = queue.shift()) {
+          input.shots.push(...await renderRound(o, profile, next.r, next.screens, tick));
+        }
+      });
     }));
     if (o.signal?.aborted) throw new Error("прогон отменён");
   } finally {
@@ -125,7 +141,7 @@ async function renderRound(o: SigameRunOptions, profile: Profile, r: RoundEvent,
       if (o.signal?.aborted) break;
       await page.feed(toFeed(r.messages.slice(fed, screen.at + 1)));
       fed = screen.at + 1;
-      const settle = await page.settle(o.mediaWaitMs ?? 12000, 600);
+      const settle = await page.settle(o.mediaWaitMs ?? MEDIA_WAIT_MS, 600);
       const measure = await page.measure();
       const q = r.questions[screen.question];
       const file = join(o.outDir, `r${r.round}-t${q.theme}-q${q.question}-${screen.part}${screen.n}-${profile.id}.jpg`);

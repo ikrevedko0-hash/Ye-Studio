@@ -2,12 +2,13 @@
 // экран телефона/ПК, сеть и снимки — через протокол отладки Chromium (CDP), как у playwright в
 // npm run sigame-e2e. Сам прогон — core/sigame/run.ts; здесь только окна и где что лежит.
 
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, dialog, nativeImage, shell } from "electron";
 import { existsSync } from "node:fs";
-import { readdir, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, join, normalize, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { devSigameDir, sigameLayout, type SigameLayout } from "../core/sigame/paths";
+import { exportHtml, shotsToExport } from "../core/sigame/exportHtml";
 import type { Profile } from "../core/sigame/report";
 import { runSigame, type SigameProgress, type TableBrowser, type TablePage } from "../core/sigame/run";
 import type { SigameReport } from "../core/sigame/report";
@@ -138,4 +139,33 @@ async function pruneRuns() {
     const all = (await readdir(runsDir())).sort();
     for (const old of all.slice(0, Math.max(0, all.length - KEEP_RUNS))) await rm(join(runsDir(), old), { recursive: true, force: true });
   } catch { /* папки ещё нет */ }
+}
+
+/**
+ * «Сохранить отчёт»: один HTML со снимками вопросов с бедами (уменьшены до 360 px — файл в несколько мегабайт,
+ * а не папка на 80). Возвращает путь или null, если сохранение отменили.
+ */
+export async function exportSigameRun(win: BrowserWindow | null, run: string, title: string, labels: Record<string, string>): Promise<string | null> {
+  const file = runFile(run, "report.json");
+  if (!file || !existsSync(file)) throw new Error("этого прогона уже нет на диске — прогоните пак заново");
+  const report = JSON.parse(await readFile(file, "utf8")) as SigameReport;
+  for (const q of report.questions) for (const s of q.shots) if (s.file) s.file = basename(s.file);
+  const images: Record<string, string> = {};
+  for (const q of report.questions.filter((x) => x.issues.length)) {
+    for (const s of shotsToExport(q)) {
+      const path = runFile(run, s.file!);
+      if (!path || !existsSync(path)) continue;
+      const img = nativeImage.createFromPath(path);
+      if (img.isEmpty()) continue;
+      images[s.file!] = `data:image/jpeg;base64,${img.resize({ width: 360, quality: "good" }).toJPEG(72).toString("base64")}`;
+    }
+  }
+  const at = (await stat(file)).mtime.toISOString();
+  const safe = title.replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "пак";
+  const opts = { title: "Сохранить отчёт прогона", defaultPath: join(app.getPath("documents"), `Прогон SIGame — ${safe}.html`), filters: [{ name: "Отчёт (HTML)", extensions: ["html"] }] };
+  const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
+  if (r.canceled || !r.filePath) return null;
+  await writeFile(r.filePath, exportHtml({ report, title, at, labels, images }), "utf8");
+  shell.showItemInFolder(r.filePath);
+  return r.filePath;
 }

@@ -14,7 +14,7 @@
 // Вывод — JSON по строке на событие (stdout). После игры раздача файлов остаётся жить, пока не закрыт stdin:
 // Ye!Studio в это время показывает записанные сообщения настоящим столом SIOnline.
 //
-// sigame-runner <pack.siq> [--parallel N] [--rounds 0,1] [--round-timeout 600] [--no-play] [--exit]
+// sigame-runner <pack.siq> [--parallel N] [--rounds 0,1] [--round-timeout 900] [--stall 120] [--no-play] [--exit]
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -49,7 +49,7 @@ void Emit(object o) { var s = JsonSerializer.Serialize(o, json); lock (outLock) 
 
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("sigame-runner <pack.siq> [--parallel N] [--rounds 0,1] [--round-timeout 600] [--no-play] [--exit]");
+    Console.Error.WriteLine("sigame-runner <pack.siq> [--parallel N] [--rounds 0,1] [--round-timeout 900] [--stall 120] [--no-play] [--exit]");
     return 64;
 }
 
@@ -57,6 +57,8 @@ var packPath = Path.GetFullPath(args[0]);
 string? Opt(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
 var parallel = int.TryParse(Opt("--parallel"), out var par) ? Math.Max(1, par) : Math.Max(1, Math.Min(4, Environment.ProcessorCount / 2));
 var roundTimeout = TimeSpan.FromSeconds(int.TryParse(Opt("--round-timeout"), out var rt) ? rt : 900);
+// столько игра может не начинать и не заканчивать ни одного вопроса — дальше раунд считаем застрявшим
+var stall = TimeSpan.FromSeconds(int.TryParse(Opt("--stall"), out var st) ? st : 120);
 var onlyRounds = Opt("--rounds")?.Split(',').Select(int.Parse).ToHashSet();
 var noPlay = args.Contains("--no-play");
 var exitAfter = args.Contains("--exit");
@@ -122,7 +124,10 @@ await Parallel.ForEachAsync(rounds, new ParallelOptions { MaxDegreeOfParallelism
     servers.Add(server);
     var names = MediaNames(gameDoc);
     var run = new RoundRun(roundIndex, gameDoc, server, seen);
-    var played = await run.PlayAsync(roundTimeout);
+    var total = seen.Rounds[roundIndex].Themes.Sum(t => t.Questions);
+    // ход раунда — Ye!Studio показывает «вопрос N из M», пока идёт игра
+    run.Progress = (n, ended) => Emit(new { type = "progress", round = roundIndex, name = seen.Rounds[roundIndex].Name, question = n, ended, total });
+    var played = await run.PlayAsync(roundTimeout, stall);
     results.Add(played);
 
     // ---------- 4. медиа: всё, что движок разослал, запрашиваем у раздачи ----------
@@ -324,6 +329,9 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
     public List<(string Kind, string Uri, int Question)> MediaUris { get; } = [];
     public List<string> Errors { get; } = [];
     public bool TimedOut { get; private set; }
+    /// <summary>Вопрос начался или закончился: (сколько начато, сколько закончено).</summary>
+    public Action<int, int>? Progress { get; set; }
+    private DateTime _lastProgress = DateTime.UtcNow;
 
     public sealed record QuestionMark(int Theme, int Question, int Start)
     {
@@ -331,7 +339,7 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
         public string? Type { get; set; }
     }
 
-    public async Task<int> PlayAsync(TimeSpan timeout)
+    public async Task<int> PlayAsync(TimeSpan timeout, TimeSpan stall)
     {
         var node = new PrimaryNode(new NodeConfiguration());
         var settings = new GameSettingsCore<AppSettingsCore>
@@ -371,7 +379,17 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
             }
         });
 
-        if (await Task.WhenAny(_done.Task, Task.Delay(timeout)) != _done.Task) TimedOut = true;
+        // конец раунда, общий предел или игра давно не двигается от вопроса к вопросу
+        var started = DateTime.UtcNow;
+        while (!_done.Task.IsCompleted)
+        {
+            await Task.WhenAny(_done.Task, Task.Delay(1000));
+            if (_done.Task.IsCompleted) break;
+            DateTime last;
+            lock (_lock) last = _lastProgress;
+            var now = DateTime.UtcNow;
+            if (now - started > timeout || now - last > stall) { TimedOut = true; break; }
+        }
         cts.Cancel();
         await mover;
         lock (_lock)
@@ -461,6 +479,7 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
                 break;
             case Messages_.QuestionEnd when _current >= 0:
                 Questions[_current].End = at;
+                Moved();
                 break;
             case Messages_.RoundEnd:
                 _done.TrySetResult();
@@ -473,6 +492,13 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
         if (_current >= 0 && Questions[_current].End < 0) Questions[_current].End = at - 1;
         Questions.Add(new QuestionMark(theme, question, at));
         _current = Questions.Count - 1;
+        Moved();
+    }
+
+    private void Moved()
+    {
+        _lastProgress = DateTime.UtcNow;
+        Progress?.Invoke(Questions.Count, Questions.Count(q => q.End >= 0));
     }
 
     /// <summary>Ответы ведущего и игроков: быстро и без выдумки — так, чтобы игра прошла каждый вопрос.</summary>

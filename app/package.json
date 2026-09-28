@@ -1,7 +1,7 @@
 {
   "name": "siq-workshop",
   "productName": "Ye!Studio",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "yesShell": 2,
   "private": true,
   "description": "Ye!Studio для «Своей игры»: планирование, медиа, сборка .siq",
