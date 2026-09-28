@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { optionsTextToReplic } from "../../core/siq/optionsLayout";
 import { History } from "../../core/history";
 import { flushSync } from "react-dom";
 import { appendTheme, isSortedByPrice, moveQuestion, moveQuestionTo, moveTheme, reorderTheme, sortThemeByPrice, type Relocate, type Slot } from "../../core/siq/board";
@@ -632,6 +633,7 @@ export function App() {
           onPackSize={() => { setPackCheck(false); setPackSize(true); }}
           onSigame={() => { setPackCheck(false); void actions.openInSigame(); }}
           onSigameRun={() => { setPackCheck(false); setSigameRun(true); }}
+          onOptionsReplic={() => mutate((p) => { optionsTextToReplic(p); })}
           onGo={(at) => {
             setPackCheck(false);
             setRound(at.round);

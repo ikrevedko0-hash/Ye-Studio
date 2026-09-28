@@ -3,6 +3,7 @@
 // в Steam); спецвопросов > 5% — жёлтая плашка FirePacks, > 15% — красная.
 
 import { packLogo } from "./board";
+import { findOptionsSqueeze } from "./optionsLayout";
 import { allItems, isAnswerOptions, isPointQuestion, isRef, itemKind, questionItems, slotStatus } from "./helpers";
 import { MEDIA_FOLDERS, type Package } from "./model";
 import { unusedMedia, type SizedMedia } from "./packSize";
@@ -76,6 +77,11 @@ export function checkPack(pkg: Package, media: SizedMedia[]): CheckIssue[] {
       });
     });
   });
+
+  // ---------- варианты ответа против картинки (core/siq/optionsLayout.ts) ----------
+  for (const at of findOptionsSqueeze(pkg)) {
+    out.push({ level: "warn", at, text: "Вопрос с вариантами: текст на экране рядом с картинкой — у игроков на телефоне кнопки займут две трети экрана, а картинка треть. Сделайте текст репликой ведущего (кнопка внизу)" });
+  }
 
   // ---------- ссылки на файлы ----------
   const missing = new Set<string>();
