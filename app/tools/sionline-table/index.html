@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru" translate="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SIGame — стол</title>
+  <!-- Та же страница, что у SImulator (SI/src/SImulator/SImulator/wwwroot2): стол SIOnline (build-lib-table).
+       driver.js подставляет window.chrome.webview — через него SIGame/SImulator шлют столу сырые сообщения
+       сервера, а SIOnline разбирает их своим MessageProcessor. -->
+  <script src="config.js"></script>
+  <script src="driver.js"></script>
+  <script defer src="sionline/vendor.js"></script>
+  <script defer src="sionline/main.js"></script>
+  <script defer src="start.js"></script>
+  <style>html, body { margin: 0; height: 100%; overflow: hidden; } #reactHost { height: 100%; }</style>
+</head>
+<body>
+  <div id="reactHost"></div>
+</body>
+</html>

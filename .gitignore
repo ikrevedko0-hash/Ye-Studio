@@ -43,3 +43,5 @@ docs/PLAN-installer.md
 /Ye-Studio-promo.mp4
 /server/reviews/packs/
 /.playwright-mcp/
+# паки-фикстуры для прогона в SIGame (npm run e2e-fixtures) — в репозитории
+!app/tests/fixtures/e2e/*.siq

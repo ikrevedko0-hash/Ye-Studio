@@ -19,3 +19,11 @@ resources/bin/
 dist-setup/
 dist-*/
 .design-out/
+
+# мутационное тестирование: npm run mutate
+reports/
+.stryker-tmp/
+# исходники SIGame и SIOnline для стенда: npm run sigame-src
+.sigame-src/
+tools/sigame-runner/bin/
+tools/sigame-runner/obj/

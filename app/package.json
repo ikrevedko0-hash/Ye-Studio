@@ -28,12 +28,18 @@
     "dist:update": "electron-vite build && electron-builder --win nsis --config.directories.output=dist-setup --publish never",
     "code-asar": "tsx scripts/code-asar.ts",
     "release": "tsx scripts/release.ts",
-    "code": "tsx scripts/code-local.ts"
+    "code": "tsx scripts/code-local.ts",
+    "mutate": "stryker run",
+    "sigame-src": "tsx scripts/sigame-src.ts",
+    "sigame-build": "tsx scripts/sigame-build.ts",
+    "sigame-e2e": "tsx scripts/sigame-e2e.ts",
+    "e2e-fixtures": "tsx scripts/e2e-fixtures.ts"
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
     "@fontsource-variable/golos-text": "^5.3.0",
     "@fontsource-variable/onest": "^5.3.1",
+    "@stryker-mutator/core": "^10.0.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -45,6 +51,7 @@
     "electron-builder": "^26.15.3",
     "electron-updater": "^6.8.9",
     "electron-vite": "^5.0.0",
+    "playwright-core": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",
