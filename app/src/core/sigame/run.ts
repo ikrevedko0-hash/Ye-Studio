@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { parseRunnerLine, type RecordedMessage, type RoundEvent, type RunnerEvent } from "./protocol";
+import { engineProgress, parseRunnerLine, type RecordedMessage, type RoundEvent, type RunnerEvent } from "./protocol";
 import { buildReport, PROFILES, type Profile, type ReportInput, type Shot, type SigameReport, type TableMeasure } from "./report";
 import { roundScreens } from "./screens";
 
@@ -60,6 +60,8 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
   child.stderr.on("data", (d: Buffer) => { stderr = (stderr + d.toString("utf8")).slice(-4000); });
 
   const input: ReportInput = { missing: [], rounds: [], shots: [] };
+  /** Ход раундов для окна (события progress стенда; старый стенд их не шлёт — тогда только «сыгран раунд»). */
+  const playing = new Map<number, { name: string; question: number; ended: number; total: number; done?: boolean }>();
   const finished = new Promise<void>((resolve, reject) => {
     const rl = createInterface({ input: child.stdout });
     rl.on("line", (line) => {
@@ -79,10 +81,18 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
     switch (e.type) {
       case "open": input.open = e; break;
       case "refs": input.missing = e.missing; break;
-      case "round":
-        input.rounds.push(e);
-        progress({ stage: "engine", done: input.rounds.length, total: 0, text: `Сыгран раунд «${e.name}»: вопросов ${e.played}` });
+      case "progress":
+        playing.set(e.round, { ...playing.get(e.round), name: e.name, question: e.question, ended: e.ended, total: e.total });
+        progress({ stage: "engine", ...engineProgress(playing) });
         break;
+      case "round": {
+        input.rounds.push(e);
+        const was = playing.get(e.round);
+        playing.set(e.round, { name: e.name, question: e.played, ended: e.played, total: was?.total ?? e.questions.length, done: true });
+        const p = engineProgress(playing);
+        progress({ stage: "engine", ...p, text: was ? p.text : `Сыгран раунд «${e.name}»: вопросов ${e.played}` });
+        break;
+      }
       case "done": input.done = e; break;
     }
   }

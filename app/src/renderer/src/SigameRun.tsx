@@ -47,19 +47,27 @@ export function SigameRun({ pack, state, onStart, onCancel, onGo, onComponents, 
   useEffect(() => { void window.api.sigameRunReady().then(setReady); }, []);
   // компонента нет — ставим прямо отсюда: сколько качать (null — в этой версии его ещё нет) и ход установки
   const [bytes, setBytes] = useState<number | null>(null);
+  /** Движок стоит, но в этой версии Ye!Studio описан более новый — предлагаем обновить. */
+  const [outdated, setOutdated] = useState(false);
   const [install, setInstall] = useState<InstallProgress | null>(null);
   const [installError, setInstallError] = useState<string | null>(null);
   useEffect(() => {
-    if (ready !== false) return;
-    void window.api.componentsState().then((c) => setBytes(c.tools.sigame?.bytes ?? null));
+    if (ready === null) return;
+    void window.api.componentsState().then((c) => {
+      const t = c.tools.sigame;
+      setBytes(t?.bytes ?? null);
+      setOutdated(!!ready && !!t?.component && !!t.version && t.version !== t.manifestVersion);
+    });
   }, [ready]);
   const installing = !!install && install.phase !== "done";
-  const doInstall = async () => {
+  const doInstall = async (update = false) => {
     setInstallError(null);
     setInstall({ phase: "download", done: 0, total: bytes ?? 0 });
     const off = window.api.onComponentsProgress(setInstall);
     try {
-      await window.api.installTool("sigame");
+      if (update) await window.api.updateTool("sigame");
+      else await window.api.installTool("sigame");
+      setOutdated(false);
       setReady(await window.api.sigameRunReady());
     } catch (e) {
       setInstallError(String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ""));
@@ -114,6 +122,22 @@ export function SigameRun({ pack, state, onStart, onCancel, onGo, onComponents, 
               <p className="pc-note">В этой версии Ye!Studio загрузки ещё нет — она придёт с обновлением. <button className="link inline" onClick={onComponents}>Открыть «Компоненты»</button></p>
             )}
             {installError && <p className="pc-dup-error">Не удалось установить: {installError}</p>}
+          </div>
+        )}
+        {outdated && !state.busy && (
+          <div className="sr-install">
+            {installing ? (
+              <div className="sr-progress">
+                <span>{install!.phase === "unzip" ? "Распаковываю…" : install!.phase === "verify" ? "Проверяю файл…" : `Обновляю: ${install!.file ?? "движок SIGame"}`}</span>
+                {!!install!.total && <progress max={install!.total} value={install!.done} />}
+              </div>
+            ) : (
+              <p>
+                Вышла новая версия движка для прогона{bytes ? ` (${Math.round(bytes / 1048576)} МБ)` : ""}.{" "}
+                <button className="link inline" onClick={() => void doInstall(true)}>Обновить</button>
+              </p>
+            )}
+            {installError && <p className="pc-dup-error">Не удалось обновить: {installError}</p>}
           </div>
         )}
         {state.error && <p className="pc-dup-error">Прогон не удался: {state.error}</p>}

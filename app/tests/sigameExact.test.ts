@@ -2,7 +2,7 @@
 // Дополняет sigame.test.ts — там сценарии, здесь то, что ловит мутационное тестирование (npm run mutate).
 
 import { describe, expect, it } from "vitest";
-import { parseRunnerLine, type RecordedMessage, type RoundEvent } from "../src/core/sigame/protocol";
+import { engineProgress, parseRunnerLine, type RecordedMessage, type RoundEvent } from "../src/core/sigame/protocol";
 import { buildReport, IOS_BAD_VIDEO, mergeShotIssues, PROFILES, shotIssues, type Shot, type TableMeasure } from "../src/core/sigame/report";
 import { MAX_SCREENS_PER_PART, questionScreens } from "../src/core/sigame/screens";
 
@@ -41,7 +41,7 @@ describe("профили и списки", () => {
   });
 
   it("все типы событий стенда принимаются", () => {
-    for (const type of ["start", "open", "refs", "round", "done"]) expect(parseRunnerLine(`{"type":"${type}"}`)).toEqual({ type });
+    for (const type of ["start", "open", "refs", "round", "done", "progress"]) expect(parseRunnerLine(`{"type":"${type}"}`)).toEqual({ type });
     expect(parseRunnerLine('{"type":""}')).toBeNull();
   });
 });
@@ -281,5 +281,22 @@ describe("отчёт: точные записи", () => {
       const r = buildReport({ open: { ok: true, file: shape }, missing: [], rounds: [round()], shots });
       expect(r.questions[0].shots.map((x) => x.file)).toEqual(["q1", "q2", "q3", "a1", "a2"]);
     }
+  });
+});
+
+describe("ход игры в окне", () => {
+  it("раунды идут параллельно: общий счёт сыгранных и что играется сейчас, по порядку раундов", () => {
+    const m = new Map([
+      [2, { name: "Финал", question: 3, ended: 3, total: 3, done: true }],
+      [1, { name: "Второй", question: 5, ended: 4, total: 30 }],
+      [0, { name: "Первый", question: 17, ended: 16, total: 30 }],
+    ]);
+    expect(engineProgress(m)).toEqual({ done: 23, total: 63, text: "SIGame играет пак: сыграно вопросов 23 из 63 · сейчас «Первый» 17 из 30, «Второй» 5 из 30" });
+  });
+
+  it("всё сыграно — без «сейчас»; лишние вопросы сверх числа в раунде не считаются", () => {
+    expect(engineProgress(new Map([[0, { name: "Р", question: 12, ended: 12, total: 10 }]]))).toEqual({ done: 10, total: 10, text: "SIGame играет пак: сыграно вопросов 10 из 10 · сейчас «Р» 10 из 10" });
+    expect(engineProgress(new Map([[0, { name: "Р", question: 4, ended: 2, total: 10, done: true }]]))).toEqual({ done: 10, total: 10, text: "SIGame играет пак: сыграно вопросов 10 из 10" });
+    expect(engineProgress(new Map())).toEqual({ done: 0, total: 0, text: "SIGame играет пак: сыграно вопросов 0 из 0" });
   });
 });

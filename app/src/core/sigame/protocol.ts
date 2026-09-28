@@ -56,11 +56,23 @@ export type RunnerEvent =
       /** Имя файла, под которым SIGame его распаковала (хэш) → имя в паке. */
       names?: Record<string, string>;
     }
-  | { type: "done"; played: number; expected: number; seconds: number };
+  | { type: "done"; played: number; expected: number; seconds: number }
+  /** Ход раунда во время игры: начато вопросов question, закончено ended, всего в раунде total. */
+  | { type: "progress"; round: number; name: string; question: number; ended: number; total: number };
 
 export type RoundEvent = Extract<RunnerEvent, { type: "round" }>;
+export type ProgressEvent = Extract<RunnerEvent, { type: "progress" }>;
 
-const TYPES = new Set(["start", "open", "refs", "round", "done"]);
+/** Строка хода игры для окна: сколько вопросов сыграно из скольких, по всем раундам сразу (они идут параллельно). */
+export function engineProgress(rounds: Map<number, { name: string; question: number; ended: number; total: number; done?: boolean }>): { done: number; total: number; text: string } {
+  const list = [...rounds.entries()].sort((a, b) => a[0] - b[0]).map(([, r]) => r);
+  const done = list.reduce((s, r) => s + (r.done ? r.total : Math.min(r.ended, r.total)), 0);
+  const total = list.reduce((s, r) => s + r.total, 0);
+  const playing = list.filter((r) => !r.done).map((r) => `«${r.name}» ${Math.min(r.question, r.total)} из ${r.total}`);
+  return { done, total, text: `SIGame играет пак: сыграно вопросов ${done} из ${total}${playing.length ? ` · сейчас ${playing.join(", ")}` : ""}` };
+}
+
+const TYPES = new Set(["start", "open", "refs", "round", "done", "progress"]);
 
 /** Строка stdout стенда → событие; посторонние строки (логи .NET) — null. */
 export function parseRunnerLine(line: string): RunnerEvent | null {

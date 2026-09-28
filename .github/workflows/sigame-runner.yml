@@ -149,14 +149,19 @@ jobs:
         run: |
           V=$(node -p "require('./tools/sigame-runner/versions.json').SI.version")
           O=$(node -p "require('./tools/sigame-runner/versions.json').SIOnline.commit.slice(0,7)")
-          TAG="sigame-$V-$O"
+          R=$(node -p "require('./tools/sigame-runner/versions.json').runner ?? 1")
+          TAG="sigame-$V-$O-r$R"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # выпущенные архивы не перезаписываем: на их суммы уже ссылаются выпущенные версии Ye!Studio
+          if gh release view "$TAG" --json assets --jq '.assets | length' 2>/dev/null | grep -qv '^0$'; then
+            echo "релиз $TAG уже выложен — поднимите runner в tools/sigame-runner/versions.json"; exit 1
+          fi
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --target "$GITHUB_SHA" --latest=false \
               --title "Компонент «Прогон в SIGame»: SIGame $V, SIOnline $O" \
               --notes "Не обновление Ye!Studio: архивы, которые приложение качает по кнопке «Прогнать в SIGame». Движок SIGame $V (MIT, github.com/VladimirKhil/SI) и стол SIOnline $O (GPL-3.0, github.com/VladimirKhil/SIOnline)."
           fi
-          gh release upload "$TAG" dist-sigame/*.zip --clobber
+          gh release upload "$TAG" dist-sigame/*.zip
           # «Latest» должен остаться у релиза приложения
           test "$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name)" != "$TAG" || { echo "релиз компонента стал Latest"; exit 1; }
       - name: Адреса и суммы — в код

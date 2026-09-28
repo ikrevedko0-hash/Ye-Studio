@@ -32,7 +32,7 @@ for (const [id, name, title, unzipTo] of list) {
     size: data.length, sha256: createHash("sha256").update(data).digest("hex"), unzipTo,
   };
 }
-part.tools!.sigame = { version: `${versions.SI.version} / ${versions.SIOnline.commit.slice(0, 7)}`, files: list.map(([id]) => id) };
+part.tools!.sigame = { version: `${versions.SI.version} / ${versions.SIOnline.commit.slice(0, 7)} / r${versions.runner ?? 1}`, files: list.map(([id]) => id) };
 
 // проверка тем же разбором, что и в приложении: вместе с манифестом оболочки
 const base = parseManifest(readFileSync(join(app, "resources", "components.json"), "utf8"));
