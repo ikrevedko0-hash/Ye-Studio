@@ -57,7 +57,7 @@ export function checkPack(pkg: Package, media: SizedMedia[]): CheckIssue[] {
     if (!r.themes?.length) out.push({ level: "error", text: `В раунде «${rn}» нет тем`, at: { round: ri } });
     (r.themes ?? []).forEach((t, ti) => {
       const where = `${rn} › ${t.name || `тема ${ti + 1}`}`;
-      if (!t.name?.trim()) out.push({ level: "error", text: `${where}: у темы нет названия`, at: { round: ri, theme: ti } });
+      if (!t.name.trim()) out.push({ level: "error", text: `${where}: у темы нет названия`, at: { round: ri, theme: ti } });
       if (!t.questions?.length) out.push({ level: "error", text: `${where}: в теме нет вопросов`, at: { round: ri, theme: ti } });
       (t.questions ?? []).forEach((q, qi) => {
         questions++;

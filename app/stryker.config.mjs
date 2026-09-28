@@ -28,6 +28,9 @@ export default {
   concurrency: 4,
   timeoutMS: 20000,
   tempDirName: ".stryker-tmp",
+  // повторный прогон пропускает мутантов, которых не касались ни код, ни тесты
+  incremental: true,
+  incrementalFile: "reports/stryker-incremental.json",
   ignorePatterns: [".sigame-src", "tools", "out", "dist", "dist-*", "reports", "resources/bin", "resources/dict", "build"],
   // TypeScript 7 (нативный) без JS API, которым Stryker переписывает tsconfig; vitest он и не нужен.
   tsconfigFile: "stryker-no-tsconfig.json",

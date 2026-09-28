@@ -27,7 +27,18 @@ function name(el: XElement): string {
   return el.localName ?? el.nodeName;
 }
 
-const raw = (n: XNode) => new XMLSerializer().serializeToString(n as never);
+/**
+ * Устаревший элемент (<global>, <type>, <scenario>) — сырым XML, как в файле. Сериализатор xmldom дописывает
+ * вынутому из документа элементу xmlns пространства имён пака — в исходнике его нет, убираем.
+ */
+function raw(n: XNode): string {
+  const s = new XMLSerializer().serializeToString(n as never);
+  const el = n as XElement;
+  if (el.hasAttribute?.("xmlns") || !el.namespaceURI) return s;
+  const own = ` xmlns="${el.namespaceURI}"`;
+  const end = s.indexOf(">");
+  return s.slice(0, end).includes(own) ? s.slice(0, end).replace(own, "") + s.slice(end) : s;
+}
 
 function parseList(el: XElement): string[] {
   return elements(el).map(textOf);
@@ -127,9 +138,15 @@ function parseRound(el: XElement): Round {
 
 export function parseContentXml(xml: string): Package {
   const errors: string[] = [];
-  const doc = new DOMParser({
-    onError: (level, msg) => { if (level !== "warning") errors.push(msg); },
-  }).parseFromString(xml.replace(/^﻿/, ""), "text/xml");
+  let doc;
+  try {
+    doc = new DOMParser({
+      onError: (level, msg) => { if (level !== "warning") errors.push(msg); },
+    }).parseFromString(xml.replace(/^﻿/, ""), "text/xml");
+  } catch (e) {
+    // на непарных тегах xmldom не зовёт onError, а бросает сам — сообщение то же, по-русски в начале
+    throw new Error("content.xml повреждён: " + (e instanceof Error ? e.message : String(e)));
+  }
   if (errors.length) throw new Error("content.xml повреждён: " + errors[0]);
   const root = doc.documentElement as unknown as XElement;
   if (!root || name(root) !== "package") throw new Error("content.xml: нет корневого <package>");
