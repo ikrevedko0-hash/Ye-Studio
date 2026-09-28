@@ -59,3 +59,40 @@ describe("reviewsUrl", () => {
     expect(reviewsUrl("Новый пак")).toBe("уепак.рф");
   });
 });
+
+// ---------- точные проверки по выжившим мутантам Stryker ----------
+
+describe("пост ВК: точно", () => {
+  it("номер пака — только в начале названия (пробелы перед — можно), «№» и пробелы вокруг — любые", () => {
+    expect(reviewsUrl("  Уе!пак №3")).toBe("уепак.рф/3");
+    expect(reviewsUrl("Уе!  пак  №   12")).toBe("уепак.рф/12");
+    expect(reviewsUrl("Лучший Уе!пак №5")).toBe("уепак.рф");
+    expect(reviewsUrl("xУе!пак №5")).toBe("уепак.рф");
+    expect(reviewsUrl("уе!ПАК №9")).toBe("уепак.рф/9");
+    expect(reviewsUrl("Уе!пак №1234")).toBe("уепак.рф");
+  });
+
+  it("название и авторы — без пробелов по краям; пустые авторы выпадают; без названия — «Без названия»", () => {
+    const pkg = samplePack("  Уе!пак №2  ");
+    pkg.info = { authors: ["  Иванов ", "   ", "Петров"] };
+    const post = buildVkPost(pkg);
+    expect(post.startsWith("📦 Уе!пак №2\n✍️ Автор(ы): Иванов, Петров\n\n")).toBe(true);
+    const noName = samplePack("");
+    noName.attrs = noName.attrs.filter(([k]) => k !== "name");
+    delete noName.info;
+    expect(buildVkPost(noName).startsWith("📦 Без названия\n\nПриятной игры!")).toBe(true);
+    expect(buildVkPost(samplePack("   ")).startsWith("📦 Без названия\n")).toBe(true);
+  });
+
+  it("теги: пробелы по краям срезаются, внутри — «_» (несколько подряд — один), знаки выкидываются, пустые — выпадают", () => {
+    const pkg = samplePack();
+    pkg.tags = ["  кино   90-х  ", "!!!", "рок-н-ролл"];
+    expect(buildVkPost(pkg).endsWith("#свояк #sigame #своя_игра #кино_90х #рокнролл\nСделано в Ye!Studio")).toBe(true);
+  });
+
+  it("нет tags вовсе — тоже только хэштеги свояка", () => {
+    const pkg = samplePack();
+    delete pkg.tags;
+    expect(buildVkPost(pkg).endsWith("#свояк #sigame #своя_игра\nСделано в Ye!Studio")).toBe(true);
+  });
+});

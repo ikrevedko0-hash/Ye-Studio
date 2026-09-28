@@ -64,6 +64,7 @@ export function moveQuestion(round: Round, from: Slot, to: Slot): Relocate {
   if (!src?.questions?.[from.question] || !dst) return identity;
 
   const srcPrices = slotPrices(src);
+  // Stryker disable next-line ConditionalExpression: в той же теме slotPrices(dst) — те же цены, это лишь экономия
   const dstPrices = same ? srcPrices : slotPrices(dst);
   const [q] = src.questions.splice(from.question, 1);
   const dq = (dst.questions ??= []);
@@ -74,6 +75,7 @@ export function moveQuestion(round: Round, from: Slot, to: Slot): Relocate {
   }
   dq.splice(at, 0, q);
 
+  // Stryker disable next-line ConditionalExpression: для той же темы repriceAfterTransfer даёт то же самое
   if (same) dq.forEach((x, i) => { x.price = srcPrices[i]; });
   else repriceAfterTransfer(src, srcPrices, dst, dstPrices);
 
