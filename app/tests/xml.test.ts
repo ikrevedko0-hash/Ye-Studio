@@ -53,6 +53,81 @@ describe("content.xml: обратный путь байт в байт", () => {
 });
 
 describe("content.xml: разбор", () => {
+  it("отформатированный (переносы, отступы, комментарии) — то же, что сжатый", () => {
+    const compact = wrap(`<info><authors><author>я</author></authors></info><rounds><round name="Р"><themes><theme name="Т"><questions><question price="1"><params><param name="question" type="content"><item>в</item></param></params><right><answer>о</answer></right></question></questions></theme></themes></round></rounds>`);
+    const pretty = wrap(`
+  <!-- комментарий -->
+  <info>
+    <authors>
+      <author>я</author>
+    </authors>
+  </info>
+  <rounds>
+    <round name="Р">
+      <themes>
+        <theme name="Т">
+          <questions>
+            <question price="1">
+              <params>
+                <param name="question" type="content"><!-- к вопросу --><item>в</item></param>
+              </params>
+              <right>
+                <answer>о</answer>
+              </right>
+            </question>
+          </questions>
+        </theme>
+      </themes>
+    </round>
+  </rounds>
+`);
+    expect(parseContentXml(pretty)).toEqual(parseContentXml(compact));
+  });
+
+  it("незнакомые элементы: в <params> и <param> — пропуск, в <theme>/<round> — не вопросы и не темы", () => {
+    const pkg = parseContentXml(wrap(`<rounds><round name="Р"><чужое /><themes><theme name="Т"><чужое /></theme><theme name="Т2"><questions><question price="1"><params>` +
+      `<чужое /><param name="g"><чужое /><param name="A">y</param></param></params></question></questions></theme></themes></round><round name="Р2"><чужое /></round></rounds>`));
+    const r = pkg.rounds!;
+    expect(r[0].themes!.map((t) => t.name)).toEqual(["Т", "Т2"]);
+    expect(r[0].themes![0].questions).toBeUndefined();
+    expect(r[1].themes).toBeUndefined();
+    const ps = r[0].themes![1].questions![0].params!;
+    expect(ps).toHaveLength(1);
+    // группа без текста и без type — текста нет вовсе (а не пустая строка)
+    expect(ps[0]).toStrictEqual({ name: "g", type: undefined, children: [{ kind: "param", param: { name: "A", type: undefined, text: "y", children: [] } }] });
+  });
+
+  it("параметр только из пробелов — текст сохраняется; numberSet без значения — поля value нет", () => {
+    const pkg = parseContentXml(wrap(`<rounds><round name="Р"><themes><theme name="Т"><questions><question price="1"><params>` +
+      `<param name="a">  </param><param name="p" type="numberSet"><numberSet minimum="1" /></param></params></question></questions></theme></themes></round></rounds>`));
+    const ps = pkg.rounds![0].themes![0].questions![0].params!;
+    expect(ps[0].text).toBe("  ");
+    const ns = ps[1].children[0];
+    expect(ns.kind === "numberSet" && "value" in ns.numberSet).toBe(false);
+  });
+
+  it("info у вопроса и файлы без атрибутов", () => {
+    const pkg = parseContentXml(wrap(`<files><file /></files><rounds><round name="Р"><themes><theme name="Т"><questions><question price="1"><info><comments>к</comments></info><right><answer>о</answer></right></question></questions></theme></themes></round></rounds>`));
+    expect(pkg.rounds![0].themes![0].questions![0].info).toEqual({ comments: "к" });
+    expect(pkg.rounds![0].themes![0].questions![0].legacyXml).toBeUndefined();
+    expect(pkg.files).toEqual([{ name: "", hash: "" }]);
+  });
+
+  it("символ BOM внутри текста — не трогаем, только в начале файла", () => {
+    const pkg = parseContentXml("\uFEFF" + wrap(`<tags><tag>а\uFEFFб</tag></tags>`));
+    expect(pkg.tags).toEqual(["а\uFEFFб"]);
+  });
+
+  it("неизвестная сущность — повреждён; атрибут без кавычек (предупреждение) — читается", () => {
+    expect(() => parseContentXml(wrap(`<tags><tag>&nbsp;</tag></tags>`))).toThrow("content.xml повреждён: entity not found:&nbsp;");
+    expect(parseContentXml(`${HEAD}<package name=П></package>`).attrs).toEqual([["name", "П"]]);
+  });
+
+  it("устаревший элемент в паке без пространства имён — как есть", () => {
+    same(`${HEAD}<package name="П"><global><x>1</x></global></package>`);
+    same(wrap(`<global xmlns="${NS}"><x>1</x></global>`));
+  });
+
   it("вопрос целиком — поля как в файле", () => {
     const pkg = parseContentXml(wrap(
       `<rounds><round name="Р" type="final"><themes><theme name="Т"><questions><question price="7" type="stake">` +
@@ -182,6 +257,21 @@ describe("content.xml: сборка", () => {
     pkg.order = ["global", "что-то", "rounds"];
     pkg.files = [{ name: "Images/a.png", hash: "h" }];
     expect(buildContentXml(pkg)).toBe(`${HEAD}<package name="П"><global /><rounds><round name="Р"><themes><theme name="Т"><questions><question price="1"><right><answer>о</answer></right></question></questions></theme></themes></round></rounds><files><file name="Images/a.png" hash="h" /></files></package>`);
+  });
+
+  it("несколько тем, раундов и файлов — подряд, без разделителей; тема без вопросов — самозакрытая", () => {
+    const pkg: Package = {
+      attrs: [["name", "П"]], order: ["files", "rounds"],
+      files: [{ name: "a", hash: "1" }, { name: "b", hash: "2" }],
+      rounds: [{ name: "Р", themes: [{ name: "Т1" }, { name: "Т2", questions: [] }] }, { name: "Р2" }],
+    };
+    expect(buildContentXml(pkg)).toBe(`${HEAD}<package name="П"><files><file name="a" hash="1" /><file name="b" hash="2" /></files><rounds><round name="Р"><themes><theme name="Т1" /><theme name="Т2"><questions /></theme></themes></round><round name="Р2" /></rounds></package>`);
+  });
+
+  it("<global> пишется и без записи в order", () => {
+    const pkg = base();
+    pkg.globalXml = "<global><x /></global>";
+    expect(buildContentXml(pkg)).toContain(`<package name="П"><global><x /></global><rounds>`);
   });
 
   it("wrong пишется после right, пустые question без params", () => {

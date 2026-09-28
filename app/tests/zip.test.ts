@@ -87,6 +87,16 @@ describe("запись и чтение .siq", () => {
     await expect(openSiq(p)).rejects.toThrow("это не пак SIGame: нет content.xml");
   });
 
+  it("после close() читать нельзя; BOM внутри content.xml остаётся", async () => {
+    const dir = tmp();
+    const p = join(dir, "c.siq");
+    await zipOf(p, { "content.xml": `\uFEFF<?xml version="1.0" encoding="utf-8"?><package name="П\uFEFF" xmlns="${NS}" />` });
+    const o = await openSiq(p);
+    expect(o.contentXml).toBe(`<?xml version="1.0" encoding="utf-8"?><package name="П\uFEFF" xmlns="${NS}" />`);
+    o.reader.close();
+    await expect(o.reader.read("content.xml")).rejects.toThrow();
+  });
+
   it("не архив — ошибка открытия", async () => {
     const dir = tmp();
     const p = join(dir, "bad.siq");

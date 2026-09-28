@@ -149,6 +149,15 @@ describe("правила по снимку стола", () => {
     expect(shotIssues(shot(measure({ images: [okImg] })), phone)).toEqual([]);
   });
 
+  it("webm и прочие контейнеры — по правилам для iPhone, только на телефоне", () => {
+    const v = (name: string) => ({ src: `http://h/package/Video/${name}`, readyState: 4, error: 0, natural: { w: 640, h: 360 }, rect: { x: 0, y: 0, w: 362, h: 204 }, timing: null });
+    const r = shotIssues(shot(measure({ videos: [v("A.WEBM")] })), phone);
+    expect(r.map((i) => [i.rule, i.source, i.level])).toEqual([["iosVideo", "rules", "warn"]]);
+    expect(r[0].text).toBe("Видео A.WEBM: Safari на iPhone .webm не играет — надёжнее mp4 (H.264)");
+    expect(shotIssues(shot(measure({ videos: [v("A.webm")] }), pc.id), pc)).toEqual([]);
+    expect(shotIssues(shot(measure({ videos: [v("A.mp4")] })), phone)).toEqual([]);
+  });
+
   it("мегапиксели iPhone — по правилам, только на телефоне", () => {
     const big = img([5000, 4000], [362, 290]);
     const r = shotIssues(shot(measure({ images: [big] })), phone);

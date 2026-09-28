@@ -40,6 +40,9 @@ export const SIGAME_LIMITS = {
   minOptionFont: 11,
 };
 
+/** Контейнеры видео, которые Safari на iPhone не играет (в Chromium прогона они могут и работать). */
+export const IOS_BAD_VIDEO = new Set(["webm", "mkv", "avi", "flv", "wmv", "ogv"]);
+
 export interface Box { x: number; y: number; w: number; h: number }
 
 /** Что вернул window.__ye.measure() на столе SIOnline. */
@@ -165,6 +168,8 @@ export function shotIssues(s: Shot, profile: Profile, names: Record<string, stri
     const name = nameOf(v.src);
     if (v.error === 4) add("codec", name, "error", `Видео ${name} браузер не играет (кодек или формат)`);
     else if (v.error) add("video", name, "error", `Видео ${name}: ошибка воспроизведения ${v.error}`);
+    const ext = name.toLowerCase().split(".").pop() ?? "";
+    if (profile.mobile && IOS_BAD_VIDEO.has(ext)) add("iosVideo", name, "warn", `Видео ${name}: Safari на iPhone .${ext} не играет — надёжнее mp4 (H.264)`, 1, "rules");
     if (profile.network && v.timing && v.timing.ms > L.slowLoadMs * 2)
       add("slow", name, "warn", `Видео ${name} грузится на мобильной сети ${(v.timing.ms / 1000).toFixed(1)} с`, v.timing.ms);
   }

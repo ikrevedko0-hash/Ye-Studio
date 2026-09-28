@@ -34,10 +34,9 @@ function name(el: XElement): string {
 function raw(n: XNode): string {
   const s = new XMLSerializer().serializeToString(n as never);
   const el = n as XElement;
-  if (el.hasAttribute?.("xmlns") || !el.namespaceURI) return s;
-  const own = ` xmlns="${el.namespaceURI}"`;
+  if (el.hasAttribute("xmlns") || !el.namespaceURI) return s;
   const end = s.indexOf(">");
-  return s.slice(0, end).includes(own) ? s.slice(0, end).replace(own, "") + s.slice(end) : s;
+  return s.slice(0, end).replace(` xmlns="${el.namespaceURI}"`, "") + s.slice(end);
 }
 
 function parseList(el: XElement): string[] {
