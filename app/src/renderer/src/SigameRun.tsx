@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { SigameProgress } from "../../core/sigame/run";
 import { PROFILES, type QuestionReport, type SigameIssue, type SigameReport } from "../../core/sigame/report";
 import type { CheckIssue } from "../../core/siq/check";
+import type { InstallProgress } from "../../core/components/manifest";
 import type { PackDTO } from "../../shared/api";
 
 export interface SigameState {
@@ -44,6 +45,29 @@ export function SigameRun({ pack, state, onStart, onCancel, onGo, onComponents, 
   const [onlyBad, setOnlyBad] = useState(true);
   const [zoom, setZoom] = useState<string | null>(null);
   useEffect(() => { void window.api.sigameRunReady().then(setReady); }, []);
+  // компонента нет — ставим прямо отсюда: сколько качать (null — в этой версии его ещё нет) и ход установки
+  const [bytes, setBytes] = useState<number | null>(null);
+  const [install, setInstall] = useState<InstallProgress | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
+  useEffect(() => {
+    if (ready !== false) return;
+    void window.api.componentsState().then((c) => setBytes(c.tools.sigame?.bytes ?? null));
+  }, [ready]);
+  const installing = !!install && install.phase !== "done";
+  const doInstall = async () => {
+    setInstallError(null);
+    setInstall({ phase: "download", done: 0, total: bytes ?? 0 });
+    const off = window.api.onComponentsProgress(setInstall);
+    try {
+      await window.api.installTool("sigame");
+      setReady(await window.api.sigameRunReady());
+    } catch (e) {
+      setInstallError(String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ""));
+    } finally {
+      off();
+      setInstall(null);
+    }
+  };
 
   const report = state.result?.report;
   const run = state.result?.run;
@@ -74,10 +98,23 @@ export function SigameRun({ pack, state, onStart, onCancel, onGo, onComponents, 
         </p>
 
         {ready === false && !report && (
-          <p className="pc-dup-error">
-            Не установлен компонент «Прогон в SIGame» (движок SIGame и стол SIOnline).{" "}
-            <button className="link inline" onClick={onComponents}>Открыть «Компоненты»</button>
-          </p>
+          <div className="sr-install">
+            <p>
+              Для прогона нужен движок SIGame и экран игрока SIOnline — это отдельная загрузка
+              {bytes ? ` (${Math.round(bytes / 1048576)} МБ)` : ""}, один раз.
+            </p>
+            {installing ? (
+              <div className="sr-progress">
+                <span>{install!.phase === "unzip" ? "Распаковываю…" : install!.phase === "verify" ? "Проверяю файл…" : `Скачиваю: ${install!.file ?? "движок SIGame"}`}</span>
+                {!!install!.total && <progress max={install!.total} value={install!.done} />}
+              </div>
+            ) : bytes !== null ? (
+              <button className="primary" onClick={() => void doInstall()}>Скачать и установить</button>
+            ) : (
+              <p className="pc-note">В этой версии Ye!Studio загрузки ещё нет — она придёт с обновлением. <button className="link inline" onClick={onComponents}>Открыть «Компоненты»</button></p>
+            )}
+            {installError && <p className="pc-dup-error">Не удалось установить: {installError}</p>}
+          </div>
         )}
         {state.error && <p className="pc-dup-error">Прогон не удался: {state.error}</p>}
 

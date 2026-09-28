@@ -1591,7 +1591,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --assistant-setup=1 [--shot=<png>] мастер «🤝 Помощник» (Claude / ChatGPT): открыть без пака и снять, ничего не ставить;
  *   --components-panel=1            с --selftest: открыть «🧩 Компоненты», напечатать машину и профили (снимок — --shot);
  *   --system-probe=1                 проверка системы без пака: видеокарта, память, диск, программы, профиль модели;
- *   --sigame-run=<siq>               «Прогон в SIGame» в скрытых окнах: печатает отчёт (беды, снимки) и выходит;
+ *   --sigame-run=<siq>               «Прогон в SIGame» в скрытых окнах: печатает отчёт и выходит (0 — чисто, 1 — ошибки, 2 — сбой);
  *   --sigame-ui=<png> --selftest=<siq>  «Автопроверка пака» → «Прогнать в SIGame…» → «Прогнать», ждёт отчёт, снимает окно;
  *   --game-preview=1 [--game-preview-shot=<png>]  нажать «▶ Как в игре» во 2-м вопросе, пройти экраны, снять кадры;
  *   --point-test=<папка>             ответ точкой: первый point-вопрос пака — круг, щелчок, допуск, «Как в игре» мимо и в точку;
@@ -3575,9 +3575,14 @@ app.whenReady().then(async () => {
   if (arg("sigame-run")) {
     // «Прогон в SIGame» без окна: движок SIGame + стол SIOnline в скрытых окнах, отчёт — в консоль
     void runSigameInApp(arg("sigame-run")!, (p) => console.log(`  ${p.stage}: ${p.text}`))
-      .then(({ run, report }) => console.log("САМОПРОВЕРКА прогона в SIGame:", run, JSON.stringify({ ...report, questions: report.questions.map((q) => ({ at: q.at, shots: q.shots.length, issues: q.issues.map((i) => i.text) })) }, null, 1)))
-      .catch((e) => { console.error("САМОПРОВЕРКА прогона в SIGame упала:", e); process.exitCode = 1; })
-      .finally(() => app.quit());
+      .then(({ run, report }) => {
+        console.log("САМОПРОВЕРКА прогона в SIGame:", run, JSON.stringify({ ...report, questions: report.questions.map((q) => ({ at: q.at, shots: q.shots.length, issues: q.issues.map((i) => i.text) })) }, null, 1));
+        // как у npm run sigame-e2e: 0 — чисто, 1 — нашлись ошибки, 2 — прогон не удался
+        process.exitCode = report.issues.some((i) => i.level === "error") ? 1 : 0;
+      })
+      .catch((e) => { console.error("САМОПРОВЕРКА прогона в SIGame упала:", e); process.exitCode = 2; })
+      // app.quit() код выхода не передаёт — а по нему CI отличает «чисто» от «нашлись ошибки»
+      .finally(() => app.exit(Number(process.exitCode ?? 0)));
   }
   if (arg("yt-login-test")) {
     void syncWindowRoute()

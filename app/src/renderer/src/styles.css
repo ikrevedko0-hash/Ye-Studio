@@ -1031,6 +1031,9 @@ button:has(> .ico), header > b:has(> .ico) { display: inline-flex; align-items: 
 
 /* ---------- «Прогон в SIGame» ---------- */
 .sigame-run { width: min(1100px, 96vw); }
+.sr-install { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.sr-install p { margin: 0; }
+.sr-install .sr-progress { align-self: stretch; }
 .sr-progress { display: flex; flex-direction: column; gap: 6px; }
 .sr-progress progress { width: 100%; }
 .sr-summary { margin: 0; }
