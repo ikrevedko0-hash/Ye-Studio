@@ -2,7 +2,11 @@ name: sigame-runner
 
 # «Прогон в SIGame»: собрать стенд (движок SIGame) и стол SIOnline с закреплённых коммитов,
 # прогнать паки-фикстуры настоящей игрой, а по кнопке — выложить архивы для «Компонентов» в релиз.
-# После выпуска: npm run sigame-manifest -- --tag <тег> --dir <скачанные архивы> и закоммитить components.json.
+# Архивы выкладываются НЕ в релизы Ye-Studio: оттуда обновляется само приложение (electron-updater берёт
+# последний релиз), чужой релиз там сломал бы обновление. Нужен отдельный репозиторий (input repo) и секрет
+# COMPONENTS_TOKEN с правом contents:write на него.
+# После выпуска: npm run sigame-manifest -- --tag <тег> --dir <скачанные архивы> --repo <тот репозиторий>
+# и закоммитить components.json.
 
 on:
   push:
@@ -16,9 +20,13 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: "Выложить архивы win-x64 в релиз"
+        description: "Выложить архивы win-x64 в релиз репозитория компонентов"
         type: boolean
         default: false
+      repo:
+        description: "Репозиторий для архивов (не сам Ye-Studio)"
+        type: string
+        default: "ikrevedko0-hash/ye-studio-components"
 
 jobs:
   e2e:
@@ -64,8 +72,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.release
     needs: e2e
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: app
@@ -87,11 +93,14 @@ jobs:
       - run: npm run sigame-build -- --rid win-x64 --zip-dir dist-sigame
       - name: Релиз
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.COMPONENTS_TOKEN }}
+          REPO: ${{ inputs.repo }}
         run: |
+          test "$REPO" != "${{ github.repository }}" || { echo "архивы не в релизы самого приложения — см. шапку файла"; exit 1; }
+          test -n "$GH_TOKEN" || { echo "нет секрета COMPONENTS_TOKEN"; exit 1; }
           V=$(node -p "require('./tools/sigame-runner/versions.json').SI.version")
           O=$(node -p "require('./tools/sigame-runner/versions.json').SIOnline.commit.slice(0,7)")
           TAG="sigame-$V-$O"
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Прогон в SIGame $V (SIOnline $O)" --notes "Движок SIGame $V и стол SIOnline $O для «Прогона в SIGame». Лицензии: SIGame — MIT, SIOnline — GPL-3.0."
-          gh release upload "$TAG" dist-sigame/*.zip --clobber
-          echo "Дальше: npm run sigame-manifest -- --tag $TAG --dir <архивы>"
+          gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1 || gh release create "$TAG" --repo "$REPO" --title "Прогон в SIGame $V (SIOnline $O)" --notes "Движок SIGame $V и стол SIOnline $O для «Прогона в SIGame». Лицензии: SIGame — MIT, SIOnline — GPL-3.0."
+          gh release upload "$TAG" dist-sigame/*.zip --clobber --repo "$REPO"
+          echo "Дальше: npm run sigame-manifest -- --tag $TAG --dir <архивы> --repo $REPO"

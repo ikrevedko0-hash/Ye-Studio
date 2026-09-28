@@ -1,6 +1,6 @@
 // Вписать «Прогон в SIGame» в resources/components.json по собранным архивам (npm run sigame-build -- --zip-dir …):
 // размер и SHA-256 каждого архива, адрес — ассет релиза GitHub с тегом --tag.
-// npm run sigame-manifest -- --tag sigame-7.13.12 --dir папка-с-архивами
+// npm run sigame-manifest -- --tag sigame-7.13.12-c94254f --dir папка-с-архивами [--repo владелец/репозиторий]
 
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -11,7 +11,8 @@ const args = process.argv.slice(2);
 const opt = (n: string) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
 const tag = opt("--tag");
 const dir = resolve(opt("--dir") ?? ".");
-const repo = opt("--repo") ?? "ikrevedko0-hash/Ye-Studio";
+// не Ye-Studio: его релизы — обновления самого приложения (см. .github/workflows/sigame-runner.yml)
+const repo = opt("--repo") ?? "ikrevedko0-hash/ye-studio-components";
 if (!tag) throw new Error("нужен --tag (тег релиза с архивами)");
 
 const app = resolve(__dirname, "..");
