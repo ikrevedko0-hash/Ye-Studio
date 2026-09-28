@@ -1,0 +1,201 @@
+name: sigame-runner
+
+# «Прогон в SIGame»: собрать движок SIGame и стол SIOnline с закреплённых коммитов и проверить их настоящей игрой
+# на паках-фикстурах — на Linux и на Windows (там же и само приложение Electron).
+#
+# Выпуск (Actions → sigame-runner → Run workflow, галочка «release»): архивы, проверенные на Windows, выкладываются
+# в релиз sigame-<SIGame>-<SIOnline> этого же репозитория БЕЗ пометки «Latest». Обновления приложения его не видят:
+# electron-updater берёт только «Latest» (в бета-канале — только теги-версии), обновление кода — только релизы
+# с code.json. Затем workflow сам вписывает адреса и суммы в src/core/sigame/component.ts, коммитит в ветку
+# и ставит компонент так же, как пользователь, — скачиванием на чистой Windows.
+
+on:
+  push:
+    paths:
+      - "app/tools/sigame-runner/**"
+      - "app/tools/sionline-table/**"
+      - "app/src/core/sigame/**"
+      - "app/src/main/sigameRun.ts"
+      - "app/scripts/sigame-*.ts"
+      - "app/tests/fixtures/e2e/**"
+      - ".github/workflows/sigame-runner.yml"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Выложить архивы для пользователей (релиз sigame-…, не «Latest»)"
+        type: boolean
+        default: false
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run sigame-src
+      - run: npm run sigame-build -- --rid linux-x64
+      # стенд на фикстурах: что говорит сам движок SIGame
+      - run: npx vitest run tests/sigameRunner.test.ts
+      # целиком, со столом SIOnline в Chromium: пустой <info /> и неудобные имена — ошибки (код 1), остальное — чисто
+      - run: npx playwright-core install --with-deps chromium
+      - name: Прогон фикстур
+        run: |
+          set +e
+          export SIGAME_E2E_CHROMIUM="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          npx tsx scripts/sigame-e2e.ts tests/fixtures/e2e/good.siq tests/fixtures/e2e/tiny-image-options.siq --out reports/sigame
+          test $? -eq 0 || { echo "чистые фикстуры дали ошибки"; exit 1; }
+          npx tsx scripts/sigame-e2e.ts tests/fixtures/e2e/empty-info.siq tests/fixtures/e2e/bad-names.siq --out reports/sigame
+          test $? -eq 1 || { echo "сломанные фикстуры должны дать ошибки"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sigame-e2e-linux
+          path: app/reports/sigame
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run sigame-src
+      # те самые архивы, что уйдут пользователям
+      - run: npm run sigame-build -- --rid win-x64 --zip-dir dist-sigame
+      - run: npx vitest run tests/sigameRunner.test.ts
+      - run: npx playwright-core install chromium
+      # паки — в папке с русскими буквами и пробелом, как у пользователей
+      - name: Прогон фикстур (Chromium)
+        run: |
+          set +e
+          D="$RUNNER_TEMP/Паки для прогона"; mkdir -p "$D"; cp tests/fixtures/e2e/*.siq "$D/"
+          export SIGAME_E2E_CHROMIUM="$(node -e "console.log(require('playwright-core').chromium.executablePath())")"
+          npx tsx scripts/sigame-e2e.ts "$D/good.siq" "$D/tiny-image-options.siq" --out reports/sigame
+          test $? -eq 0 || { echo "чистые фикстуры дали ошибки"; exit 1; }
+          npx tsx scripts/sigame-e2e.ts "$D/empty-info.siq" "$D/bad-names.siq" --out reports/sigame
+          test $? -eq 1 || { echo "сломанные фикстуры должны дать ошибки"; exit 1; }
+      # само приложение: кнопка «Прогнать в SIGame» идёт через скрытые окна Electron
+      - run: npx electron-vite build
+      - name: Прогон в приложении (Electron)
+        run: |
+          set +e
+          D="$RUNNER_TEMP/Паки для прогона"
+          npx electron . --sigame-run="$D/good.siq"; c=$?
+          test $c -eq 0 || { echo "good.siq: код $c, ждали 0"; exit 1; }
+          npx electron . --sigame-run="$D/empty-info.siq"; c=$?
+          test $c -eq 1 || { echo "empty-info.siq: код $c, ждали 1"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sigame-win-x64
+          path: app/dist-sigame/*.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sigame-e2e-windows
+          path: app/reports/sigame
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: app
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      GH_TOKEN: ${{ github.token }}
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: sigame-win-x64
+          path: app/dist-sigame
+      - run: npm ci --no-audit --no-fund
+      - name: Релиз sigame-… (не «Latest»)
+        id: rel
+        run: |
+          V=$(node -p "require('./tools/sigame-runner/versions.json').SI.version")
+          O=$(node -p "require('./tools/sigame-runner/versions.json').SIOnline.commit.slice(0,7)")
+          TAG="sigame-$V-$O"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --latest=false \
+              --title "Компонент «Прогон в SIGame»: SIGame $V, SIOnline $O" \
+              --notes "Не обновление Ye!Studio: архивы, которые приложение качает по кнопке «Прогнать в SIGame». Движок SIGame $V (MIT, github.com/VladimirKhil/SI) и стол SIOnline $O (GPL-3.0, github.com/VladimirKhil/SIOnline)."
+          fi
+          gh release upload "$TAG" dist-sigame/*.zip --clobber
+          # «Latest» должен остаться у релиза приложения
+          test "$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name)" != "$TAG" || { echo "релиз компонента стал Latest"; exit 1; }
+      - name: Адреса и суммы — в код
+        id: commit
+        run: |
+          npx tsx scripts/sigame-manifest.ts --tag "${{ steps.rel.outputs.tag }}" --dir dist-sigame --repo "${{ github.repository }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/core/sigame/component.ts
+          git diff --cached --quiet || git commit -m "Компонент «Прогон в SIGame»: ${{ steps.rel.outputs.tag }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  # как у пользователя: чистая Windows без исходников SIGame, компонент качается из релиза установщиком приложения
+  installed:
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npx tsx scripts/sigame-install-test.ts
+      - run: npx electron-vite build
+      - name: Прогон в приложении с установленным компонентом
+        run: |
+          set +e
+          test ! -e .sigame-src || { echo "исходники SIGame не должны быть на этой машине"; exit 1; }
+          npx electron . --sigame-run="$PWD/tests/fixtures/e2e/good.siq"; c=$?
+          test $c -eq 0 || { echo "good.siq: код $c, ждали 0"; exit 1; }
+          npx electron . --sigame-run="$PWD/tests/fixtures/e2e/tiny-image-options.siq"; c=$?
+          test $c -eq 0 || { echo "tiny-image-options.siq: код $c, ждали 0"; exit 1; }

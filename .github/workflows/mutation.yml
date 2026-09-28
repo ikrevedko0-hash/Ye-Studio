@@ -1,0 +1,33 @@
+name: mutation
+
+# Мутационные тесты разбора и записи пака (app/stryker.config.mjs): раз в неделю и по кнопке.
+# Отчёт — артефакт mutation-report (index.html). Падает, если счёт ниже thresholds.break.
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  stryker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        working-directory: app
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run mutate -- --concurrency 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mutation-report
+          path: app/reports/mutation

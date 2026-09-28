@@ -65,6 +65,12 @@ export function parseManifest(raw: string): Manifest {
   return m;
 }
 
+/** Добавить к манифесту файлы и программы из кода (они новее манифеста оболочки и берут верх). */
+export function mergeManifest(base: Manifest, extra: Pick<Manifest, "files" | "tools"> | null): Manifest {
+  if (!extra) return base;
+  return { ...base, files: { ...base.files, ...extra.files }, tools: { ...base.tools, ...extra.tools } };
+}
+
 export interface PlannedFile extends ManifestFile {
   id: string;
   /** Куда качать, от папки модели: сам файл модели или архив в downloads/. */

@@ -29,6 +29,7 @@ const TOOLS = [
   { id: "ffmpeg", title: "ffmpeg", what: "обрезка, перекодирование, коллажи, волна звука", without: "медиа-редакторы (обрезка, перекодирование) не работают" },
   { id: "yt-dlp", title: "yt-dlp", what: "видео с YouTube, Rutube, Instagram и по ссылкам", without: "видео из интернета не ищется; картинки и звук — работают" },
   { id: "upscaler", title: "ИИ-увеличение", what: "кнопка «Увеличить ×4 (ИИ)» в редакторе картинок (Real-ESRGAN)", without: "мелкие картинки не увеличить нейросетью" },
+  { id: "sigame", title: "Прогон в SIGame", what: "«Автопроверка пака» → «Прогнать в SIGame»: настоящий движок SIGame и экран игрока SIOnline", without: "пак проверяется только своими правилами, а не самой игрой" },
 ];
 
 const PHASE: Record<InstallProgress["phase"], string> = {

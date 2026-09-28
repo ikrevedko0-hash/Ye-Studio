@@ -20,6 +20,7 @@ import { RoundTabs } from "./RoundTabs";
 import { QuestionEditor } from "./QuestionEditor";
 import { PackSize } from "./PackSize";
 import { PackCheck, type DupState } from "./PackCheck";
+import { SigameRun, type SigameState } from "./SigameRun";
 import { WordStudio } from "./WordStudio";
 import { AiSettings } from "./AiSettings";
 import { Components } from "./Components";
@@ -60,6 +61,8 @@ export function App() {
   const [publish, setPublish] = useState(false);
   const [packCheck, setPackCheck] = useState(false);
   const [dups, setDups] = useState<DupState>({ exclude: [] });
+  const [sigameRun, setSigameRun] = useState(false);
+  const [sigame, setSigame] = useState<SigameState>({});
   /** несохранённый пак, оставшийся после сбоя, — предлагаем восстановить на заставке */
   const [draft, setDraft] = useState<DraftInfo | null>(null);
   useEffect(() => { void window.api.draftInfo().then(setDraft); }, []);
@@ -422,6 +425,22 @@ export function App() {
         ? "SIGame запускается. Путь к паку скопирован — в SIGame «Добавить пакет» → Ctrl+V"
         : "SIGame не найдена (ни в AppData, ни в Steam). Путь к паку скопирован в буфер");
     },
+    /** «Прогнать в SIGame»: сохранить и сыграть пак настоящим движком SIGame, показать столом SIOnline. */
+    sigameRun: async () => {
+      if (!pack || sigame.busy) return;
+      const path = dirty || !pack.path ? await actions.save(false) : pack.path;
+      if (!path) return;
+      setSigame((s) => ({ ...s, busy: true, error: undefined, progress: undefined }));
+      const off = window.api.onSigameProgress((p) => setSigame((s) => ({ ...s, progress: p })));
+      try {
+        const r = await window.api.sigameRun(path);
+        setSigame({ result: { ...r, at: Date.now() } });
+      } catch (e) {
+        setSigame((s) => ({ ...s, busy: false, error: e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e) }));
+      } finally {
+        off();
+      }
+    },
     save: async (saveAs: boolean): Promise<string | undefined> => {
       if (!pack) return;
       setStatus("Сохраняю…");
@@ -612,8 +631,24 @@ export function App() {
           onClose={() => setPackCheck(false)}
           onPackSize={() => { setPackCheck(false); setPackSize(true); }}
           onSigame={() => { setPackCheck(false); void actions.openInSigame(); }}
+          onSigameRun={() => { setPackCheck(false); setSigameRun(true); }}
           onGo={(at) => {
             setPackCheck(false);
+            setRound(at.round);
+            setSel(at.theme !== undefined && at.question !== undefined ? { round: at.round, theme: at.theme, question: at.question } : null);
+          }}
+        />
+      )}
+      {sigameRun && (
+        <SigameRun
+          pack={pack}
+          state={sigame}
+          onStart={() => void actions.sigameRun()}
+          onCancel={() => void window.api.sigameRunCancel()}
+          onComponents={() => { setSigameRun(false); setComponents(true); }}
+          onClose={() => setSigameRun(false)}
+          onGo={(at) => {
+            setSigameRun(false);
             setRound(at.round);
             setSel(at.theme !== undefined && at.question !== undefined ? { round: at.round, theme: at.theme, question: at.question } : null);
           }}

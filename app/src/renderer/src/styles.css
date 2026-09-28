@@ -1028,3 +1028,23 @@ button:has(> .ico), header > b:has(> .ico) { display: inline-flex; align-items: 
 .board-row.theme-drop { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 8px; }
 /* «Вставить тему» из буфера — заметнее, чем «+ Тема» */
 .add-theme.paste-theme { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- «Прогон в SIGame» ---------- */
+.sigame-run { width: min(1100px, 96vw); }
+.sr-install { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.sr-install p { margin: 0; }
+.sr-install .sr-progress { align-self: stretch; }
+.sr-progress { display: flex; flex-direction: column; gap: 6px; }
+.sr-progress progress { width: 100%; }
+.sr-summary { margin: 0; }
+.sr-filter { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; align-self: flex-start; gap: 6px; color: var(--muted); font-size: 13px; }
+.sr-filter input { margin: 0; width: auto; }
+.sr-questions { overflow-y: auto; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.sr-question { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.sr-where { font-weight: 600; align-self: flex-start; }
+.sr-shots { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.sr-shots figure { margin: 0; flex: none; cursor: zoom-in; display: flex; flex-direction: column; gap: 2px; }
+.sr-shots img { height: 150px; border-radius: 6px; border: 1px solid var(--line); background: var(--wash); }
+.sr-shots figcaption { color: var(--muted); font-size: 11px; }
+.sr-zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, .8); display: flex; align-items: center; justify-content: center; cursor: zoom-out; z-index: 100; }
+.sr-zoom img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }

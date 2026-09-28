@@ -44,6 +44,7 @@ export class ZipReader {
   static open(path: string): Promise<ZipReader> {
     return new Promise((resolve, reject) => {
       yauzl.open(path, { lazyEntries: true, autoClose: false }, (err, zip) => {
+        // Stryker disable next-line all: yauzl отдаёт либо ошибку, либо архив — второй ветки не бывает
         if (err || !zip) return reject(err ?? new Error("не удалось открыть архив"));
         const map = new Map<string, yauzl.Entry>();
         const entries: SiqEntry[] = [];
@@ -70,6 +71,7 @@ export class ZipReader {
     if (!e) return Promise.reject(new Error(`в архиве нет файла ${name}`));
     return new Promise((resolve, reject) => {
       this.zip.openReadStream(e, (err, stream) => {
+        // Stryker disable next-line all: как и у open — либо ошибка, либо поток
         if (err || !stream) return reject(err);
         const chunks: Buffer[] = [];
         stream.on("data", (c: Buffer) => chunks.push(c));
@@ -136,7 +138,9 @@ export async function writeSiq(outPath: string, pkg: Package, entries: EntryToWr
   });
   zip.outputStream.pipe(out);
 
+  // Stryker disable next-line StringLiteral: кодировка по умолчанию у Buffer.from — тоже utf8
   const xml = Buffer.concat([BOM, Buffer.from(buildContentXml(pkg), "utf8")]);
+  // Stryker disable next-line ObjectLiteral: сжатие у yazl и так по умолчанию; пишем явно — как SIQuester
   zip.addBuffer(xml, "content.xml", { compress: true });
   for (const e of entries) {
     if (e.name === "content.xml") continue;

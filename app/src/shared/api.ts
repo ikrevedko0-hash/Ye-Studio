@@ -15,6 +15,8 @@ import type { QuotaInfo } from "../core/ai/quota";
 import type { PhraseSet } from "../core/words/phrases";
 import type { ProfileId, SystemReport } from "../core/system/probe";
 import type { ComponentsState, InstallProgress } from "../core/components/manifest";
+import type { SigameProgress } from "../core/sigame/run";
+import type { SigameReport } from "../core/sigame/report";
 
 /** Галочки со страницы установщика «Компоненты». */
 export interface FirstRunOptions {
@@ -229,6 +231,12 @@ export interface Api {
   openBackups(): Promise<string>;
   /** Запустить SIGame; путь к паку кладётся в буфер. ok: false — SIGame не найдена. */
   openInSigame(packPath: string): Promise<{ ok: boolean }>;
+  /** Стоит ли «Прогон в SIGame» (стенд с движком SIGame и стол SIOnline). */
+  sigameRunReady(): Promise<boolean>;
+  /** Прогнать сохранённый пак через настоящий SIGame; снимки — siq://sigame/<run>/<file>. */
+  sigameRun(packPath: string): Promise<{ run: string; report: SigameReport }>;
+  sigameRunCancel(): Promise<void>;
+  onSigameProgress(cb: (p: SigameProgress) => void): () => void;
   /** Выбрать существующий пак для переноса темы (открытый нельзя). path — без диалога. */
   pickTargetPack(path?: string): Promise<TargetPack | null>;
   /** Дописать тему со всеми её файлами в другой пак; null — автор отменил выбор файла. */

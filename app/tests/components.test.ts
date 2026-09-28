@@ -152,3 +152,27 @@ describe("чем запускать yt-dlp", () => {
     expect(manifest.files["sd-vulkan-upscaler"].sha256).toBe(manifest.files["sd-vulkan"].sha256);
   });
 });
+
+describe("компонент «Прогон в SIGame» из кода", () => {
+  it("mergeManifest: добавляет файлы и программы, одноимённые берёт из кода; null — манифест как был", async () => {
+    const { mergeManifest } = await import("../src/core/components/manifest");
+    const base = { version: 1, files: { a: { title: "A", url: "https://x/a", size: 1, sha256: "0".repeat(64), path: "a" } }, profiles: {}, tools: { t: { version: "1", files: ["a"] } } } as Manifest;
+    expect(mergeManifest(base, null)).toBe(base);
+    const b = { title: "B", url: "https://x/b.zip", size: 2, sha256: "1".repeat(64), unzipTo: "b" };
+    const m = mergeManifest(base, { files: { b }, tools: { t: { version: "2", files: ["a", "b"] } } });
+    expect(m.files).toEqual({ a: base.files.a, b });
+    expect(m.tools).toEqual({ t: { version: "2", files: ["a", "b"] } });
+    expect(base.tools).toEqual({ t: { version: "1", files: ["a"] } });
+  });
+
+  it("выпущенный компонент разбирается вместе с манифестом оболочки и лежит в релизе sigame-…, а не в релизе приложения", async () => {
+    const { mergeManifest } = await import("../src/core/components/manifest");
+    const { SIGAME_COMPONENT } = await import("../src/core/sigame/component");
+    if (!SIGAME_COMPONENT) return;
+    const base = parseManifest(readFileSync(join(__dirname, "..", "resources", "components.json"), "utf8"));
+    const m = parseManifest(JSON.stringify(mergeManifest(base, SIGAME_COMPONENT)));
+    const files = planTool(m, "sigame");
+    expect(files.map((f) => f.unzipTo)).toEqual(["sigame/runner", "sigame/table"]);
+    for (const f of files) expect(f.url).toMatch(/^https:\/\/github\.com\/ikrevedko0-hash\/Ye-Studio\/releases\/download\/sigame-[^/]+\/[^/]+\.zip$/);
+  });
+});

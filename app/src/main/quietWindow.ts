@@ -11,14 +11,18 @@
 import { spawn } from "node:child_process";
 import { app, type BrowserWindow } from "electron";
 
-const TEST_FLAGS = /^--(selftest|shot|save-copy|new-with-media|rename-theme|ai-settings|imagegen-test|works-test|preset-test|image-test|collage-test|media-center|word-studio|split|yt-diagnose|library-test|yt-login-test|proposals|system-probe|first-run|board-test|point-test|pixelate-test|pixelate-theme|silhouette-test|logo-test|pack-size|assistant-setup|poster|theme-clip)=/;
+const TEST_FLAGS = /^--(selftest|shot|save-copy|new-with-media|rename-theme|ai-settings|imagegen-test|works-test|preset-test|image-test|collage-test|media-center|word-studio|split|yt-diagnose|library-test|yt-login-test|proposals|system-probe|first-run|board-test|point-test|pixelate-test|pixelate-theme|silhouette-test|logo-test|pack-size|assistant-setup|poster|theme-clip|sigame-run|sigame-ui)=/;
 
 /** Запущено ли приложение самопроверкой (любой из её флагов). */
 export const SELF_TEST = process.argv.some((a) => TEST_FLAGS.test(a));
 
-/** Вызывать до app.whenReady: переключатели Chromium читаются только при старте. */
+/**
+ * Вызывать до app.whenReady: переключатели Chromium читаются только при старте.
+ * Расчёт перекрытия выключен всегда, не только в самопроверке: «Прогон в SIGame» рисует стол в скрытых окнах,
+ * и Windows без этого считает их перекрытыми — кадры не рисуются, прогон ждёт их вечно.
+ */
 export function prepareQuietSelfTest(): void {
-  if (SELF_TEST) app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+  app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
 }
 
 /** Показать окно самопроверки неактивным и отправить его под все остальные окна. */

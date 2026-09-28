@@ -16,9 +16,10 @@ import { Transform } from "node:stream";
 import yauzl from "yauzl";
 import { findAiConfig, type AiConfig } from "../core/ai/config";
 import { once, httpReason } from "../core/media/providers/http";
-import { detectProfile, launchFor, MODEL_DIR, parseManifest, planProfile, planTool, totalBytes, type Manifest, type PlannedFile } from "../core/components/manifest";
+import { detectProfile, launchFor, mergeManifest, MODEL_DIR, parseManifest, planProfile, planTool, totalBytes, type Manifest, type PlannedFile } from "../core/components/manifest";
 import type { ProfileId } from "../core/system/probe";
 import type { InstallProgress } from "../core/components/manifest";
+import { SIGAME_COMPONENT } from "../core/sigame/component";
 
 export type { InstallProgress };
 import { readComponents, saveComponent, forgetComponent } from "./components";
@@ -147,7 +148,9 @@ export async function registerLocalServer(baseDir: string, launch: { exe: string
 }
 
 export async function loadManifest(resourcesDir: string): Promise<Manifest> {
-  return parseManifest(await readFile(join(resourcesDir, "components.json"), "utf8"));
+  const m = parseManifest(await readFile(join(resourcesDir, "components.json"), "utf8"));
+  // компонент «Прогон в SIGame» описан в коде (core/sigame/component.ts) — проверяем его тем же разбором
+  return SIGAME_COMPONENT ? parseManifest(JSON.stringify(mergeManifest(m, SIGAME_COMPONENT))) : m;
 }
 
 /**
@@ -251,7 +254,7 @@ export async function removeModel(componentsDir: string, baseDir: string): Promi
 export const YTDLP_DIR = "yt-dlp";
 
 /** Главный файл программы-компонента: по нему решаем «стоит». Папка программы — её id. */
-export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe" };
+export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe", sigame: "runner/sigame-runner.exe" };
 
 export function toolInstalled(componentsDir: string, tool: string): boolean {
   return existsSync(join(componentsDir, tool, TOOL_MAIN[tool] ?? ""));
