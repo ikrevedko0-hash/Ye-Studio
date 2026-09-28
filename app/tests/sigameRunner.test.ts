@@ -36,7 +36,8 @@ describe.skipIf(!built)(`стенд SIGame на фикстурах${built ? "" :
     expect(pick(ev, "refs")[0].missing).toEqual([]);
     const [round] = pick(ev, "round") as RoundEvent[];
     expect(round.timedOut).toBe(false);
-    expect(round.questions.map((q) => [q.theme, q.question])).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]]);
+    // порядок розыгрыша решает движок (кто выбирает, как быстро ответили) — важен набор: все вопросы и по разу
+    expect(round.questions.map((q) => [q.theme, q.question]).sort((a, b) => a[0] - b[0] || a[1] - b[1])).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]]);
     expect(round.questions.every((q) => q.end > q.start)).toBe(true);
     expect(round.media.map((m) => m.status)).toEqual([200]);
     expect(Object.values(round.names ?? {})).toEqual(["кадр.png"]);

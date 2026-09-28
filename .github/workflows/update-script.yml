@@ -1,0 +1,67 @@
+name: update-script
+
+# update-ye-studio.cmd на настоящей Windows: пробный «GitHub» (голый репозиторий) и «компьютер автора» с
+# несохранёнными правками и коммитом в main, которого нет на GitHub. Файл запускается так же, как его скачивают
+# с GitHub (переводы строк LF), двойной щелчок = cmd /c.
+
+on:
+  push:
+    paths:
+      - "update-ye-studio.cmd"
+      - ".github/workflows/update-script.yml"
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Пробный GitHub и компьютер автора
+        run: |
+          set -e
+          T="$RUNNER_TEMP"; git config --global user.name ci; git config --global user.email ci@localhost
+          git init -q --bare -b main "$T/Ye-Studio.git"
+          git clone -q "$T/Ye-Studio.git" "$T/seed"; cd "$T/seed"
+          echo "v1" > a.txt; git add a.txt; git commit -qm v1; git push -q origin main
+          git clone -q "$T/Ye-Studio.git" "$T/Мой Ye-Studio"
+          # на GitHub вышла новая версия — вместе с самим скриптом
+          echo "v2" > b.txt; cp "$GITHUB_WORKSPACE/update-ye-studio.cmd" .; git add b.txt update-ye-studio.cmd; git commit -qm v2; git push -q origin main
+          # у автора: коммит в main, которого нет на GitHub, правка и новый файл
+          cd "$T/Мой Ye-Studio"
+          echo "мой коммит" > c.txt; git add c.txt; git commit -qm "local"
+          echo "правка" >> a.txt; echo "новый" > d.txt
+          # скачанный с GitHub файл — с переводами строк LF
+          tr -d '\r' < "$GITHUB_WORKSPACE/update-ye-studio.cmd" > update-ye-studio.cmd
+      - name: Двойной щелчок
+        shell: cmd
+        env:
+          YE_NO_PAUSE: "1"
+        run: cmd /c "%RUNNER_TEMP%\Мой Ye-Studio\update-ye-studio.cmd"
+      - name: Проверка
+        run: |
+          set -e
+          cd "$RUNNER_TEMP/Мой Ye-Studio"
+          test "$(git rev-parse --abbrev-ref HEAD)" = main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          test -f b.txt || { echo "нет свежей версии"; exit 1; }
+          test -z "$(git status --porcelain)" || { git status; exit 1; }
+          git ls-files --error-unmatch update-ye-studio.cmd
+          B=$(git -C "$RUNNER_TEMP/Ye-Studio.git" branch --format='%(refname:short)')
+          echo "$B"
+          L=$(echo "$B" | grep '^local-after-release-'); M=$(echo "$B" | grep '^local-main-')
+          git -C "$RUNNER_TEMP/Ye-Studio.git" show "$L:a.txt" | grep -q правка
+          git -C "$RUNNER_TEMP/Ye-Studio.git" show "$L:d.txt" | grep -q новый
+          git -C "$RUNNER_TEMP/Ye-Studio.git" show "$M:c.txt" | grep -q "мой коммит"
+      - name: Второй запуск
+        shell: cmd
+        env:
+          YE_NO_PAUSE: "1"
+        run: cmd /c "%RUNNER_TEMP%\Мой Ye-Studio\update-ye-studio.cmd"
+      - name: После второго запуска — без новых веток и правок
+        run: |
+          cd "$RUNNER_TEMP/Ye-Studio.git"
+          test "$(git branch | wc -l)" -eq 3 || { git branch; exit 1; }
+          cd "$RUNNER_TEMP/Мой Ye-Studio"; test -z "$(git status --porcelain)"

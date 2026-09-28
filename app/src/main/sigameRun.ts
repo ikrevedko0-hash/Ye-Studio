@@ -85,14 +85,26 @@ function electronTable(tableHtml: string): TableBrowser {
         screenshot: async (path) => {
           // скрытое окно само не перерисовывается: без этого снимок — прошлый кадр (табло вместо вопроса)
           wc.invalidate();
-          await js("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))");
-          const r = (await cdp("Page.captureScreenshot", { format: "jpeg", quality: 70, fromSurface: true })) as { data: string };
-          await writeFile(path, Buffer.from(r.data, "base64"));
+          // кадры могут и не идти (окно сочтено скрытым) — тогда не ждём их вечно
+          await js("new Promise((r) => { const t = setTimeout(r, 500); requestAnimationFrame(() => requestAnimationFrame(() => { clearTimeout(t); r(); })); })");
+          const r = (await withTimeout(cdp("Page.captureScreenshot", { format: "jpeg", quality: 70, fromSurface: true }), 20000)) as { data: string } | null;
+          // запасной путь: capturePage сам делает страницу видимой на время снимка
+          const data = r ? Buffer.from(r.data, "base64") : (await withTimeout(wc.capturePage(), 20000))?.toJPEG(70);
+          if (!data?.length) throw new Error("стол SIOnline не отдал снимок экрана за 20 с");
+          await writeFile(path, data);
         },
         close: async () => { try { wc.debugger.detach(); } catch { /* уже */ } win.destroy(); },
       };
     },
   };
+}
+
+/** Результат обещания или null, если оно не успело. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => resolve(null), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
 }
 
 let current: AbortController | null = null;
