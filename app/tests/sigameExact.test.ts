@@ -33,7 +33,7 @@ const issue = (rule: string, subject: string, level: "error" | "warn", text: str
 describe("профили и списки", () => {
   it("экраны прогона — как у игроков", () => {
     expect(PROFILES).toEqual([
-      { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 100, downBytesPerSec: 500_000 } },
+      { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 70, downBytesPerSec: 1_500_000 } },
       { id: "phoneLand", title: "Телефон лёжа", width: 844, height: 390, scale: 3, mobile: true },
       { id: "pc", title: "Компьютер", width: 1920, height: 1080, scale: 1, mobile: false },
     ]);

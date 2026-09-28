@@ -37,12 +37,18 @@ export interface SigameRunOptions {
   browser: TableBrowser;
   outDir: string;
   profiles?: Profile[];
-  /** Сколько экранов снимать одновременно (по профилям). */
   onProgress?: (p: SigameProgress) => void;
   signal?: AbortSignal;
-  /** Сколько ждать загрузки медиа на экране, мс. */
+  /** Сколько ждать загрузки медиа на экране, мс. Долгая загрузка всё равно попадает в отчёт — по её времени. */
   mediaWaitMs?: number;
+  /** Сколько окон на экран (профиль) снимают раунды одновременно. */
+  windows?: number;
 }
+
+/** Предел ожидания медиа на одном снимке по умолчанию, мс. */
+export const MEDIA_WAIT_MS = 8000;
+/** Окон на профиль по умолчанию: раунды снимаются параллельно — экраны телефона не ждут друг друга. */
+export const WINDOWS_PER_PROFILE = 2;
 
 const toFeed = (list: RecordedMessage[]) => list.map(([, text, sender, isSystem]) => ({ text, sender, isSystem }));
 
@@ -106,15 +112,15 @@ export async function runSigame(o: SigameRunOptions): Promise<SigameReport> {
     const perRound = rounds.map((r) => ({ r, screens: roundScreens(r.messages, r.questions) }));
     const total = perRound.reduce((s, x) => s + x.screens.length, 0) * profiles.length;
     let done = 0;
-    await Promise.all(profiles.map(async (profile) => {
-      for (const { r, screens } of perRound) {
-        if (o.signal?.aborted) return;
-        const shots = await renderRound(o, profile, r, screens, () => {
-          done++;
-          progress({ stage: "table", done, total, text: `Экраны: ${done} из ${total}` });
-        });
-        input.shots.push(...shots);
-      }
+    const tick = () => { done++; progress({ stage: "table", done, total, text: `Экраны: ${done} из ${total}` }); };
+    // по каждому профилю — несколько окон; каждое берёт следующий ещё не снятый раунд
+    await Promise.all(profiles.flatMap((profile) => {
+      const queue = perRound.filter((x) => x.screens.length);
+      return Array.from({ length: Math.max(1, Math.min(o.windows ?? WINDOWS_PER_PROFILE, queue.length)) }, async () => {
+        for (let next = queue.shift(); next && !o.signal?.aborted; next = queue.shift()) {
+          input.shots.push(...await renderRound(o, profile, next.r, next.screens, tick));
+        }
+      });
     }));
     if (o.signal?.aborted) throw new Error("прогон отменён");
   } finally {
@@ -135,7 +141,7 @@ async function renderRound(o: SigameRunOptions, profile: Profile, r: RoundEvent,
       if (o.signal?.aborted) break;
       await page.feed(toFeed(r.messages.slice(fed, screen.at + 1)));
       fed = screen.at + 1;
-      const settle = await page.settle(o.mediaWaitMs ?? 12000, 600);
+      const settle = await page.settle(o.mediaWaitMs ?? MEDIA_WAIT_MS, 600);
       const measure = await page.measure();
       const q = r.questions[screen.question];
       const file = join(o.outDir, `r${r.round}-t${q.theme}-q${q.question}-${screen.part}${screen.n}-${profile.id}.jpg`);

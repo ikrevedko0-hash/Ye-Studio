@@ -20,7 +20,8 @@ export interface Profile {
 }
 
 export const PROFILES: Profile[] = [
-  { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 100, downBytesPerSec: 500_000 } },
+  // мобильный 4G: 12 Мбит/с и 70 мс — обычная скорость у игроков, не худший случай
+  { id: "phone", title: "Телефон", width: 390, height: 844, scale: 3, mobile: true, network: { latencyMs: 70, downBytesPerSec: 1_500_000 } },
   { id: "phoneLand", title: "Телефон лёжа", width: 844, height: 390, scale: 3, mobile: true },
   { id: "pc", title: "Компьютер", width: 1920, height: 1080, scale: 1, mobile: false },
 ];
