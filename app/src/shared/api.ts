@@ -236,6 +236,8 @@ export interface Api {
   /** Прогнать сохранённый пак через настоящий SIGame; снимки — siq://sigame/<run>/<file>. */
   sigameRun(packPath: string): Promise<{ run: string; report: SigameReport }>;
   sigameRunCancel(): Promise<void>;
+  /** «Сохранить отчёт»: HTML со снимками вопросов с бедами; labels — «раунд/тема/вопрос» → подпись. null — отменили. */
+  sigameExport(run: string, title: string, labels: Record<string, string>): Promise<string | null>;
   onSigameProgress(cb: (p: SigameProgress) => void): () => void;
   /** Выбрать существующий пак для переноса темы (открытый нельзя). path — без диалога. */
   pickTargetPack(path?: string): Promise<TargetPack | null>;

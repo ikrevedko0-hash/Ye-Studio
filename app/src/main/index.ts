@@ -20,7 +20,7 @@ import { enableEditMenu } from "./editMenu";
 import { upscaleImage, upscalerReady } from "./upscale";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
 import { findSigame, launchSigame } from "./sigame";
-import { cancelSigameRun, runFile, runSigameInApp, sigameInstalled } from "./sigameRun";
+import { cancelSigameRun, exportSigameRun, runFile, runSigameInApp, sigameInstalled } from "./sigameRun";
 import { cleanupCode, initUpdater } from "./updater";
 import { appVersion, boot } from "./version"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
@@ -833,6 +833,8 @@ function registerIpc() {
   ipcMain.handle("sigame:runReady", () => !!sigameInstalled());
   ipcMain.handle("sigame:run", (e, packPath: string) => runSigameInApp(packPath, (p) => e.sender.send("sigame:progress", p)));
   ipcMain.handle("sigame:runCancel", () => cancelSigameRun());
+  ipcMain.handle("sigame:export", (e, run: string, title: string, labels: Record<string, string>) =>
+    exportSigameRun(BrowserWindow.fromWebContents(e.sender), run, title, labels));
   ipcMain.handle("backups:open", async () => { await mkdir(BACKUP_DIR(), { recursive: true }); return shell.openPath(BACKUP_DIR()); });
 
   ipcMain.handle("media:add", async (_e, paths?: string[]) => {
