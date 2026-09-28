@@ -36,10 +36,10 @@ jobs:
           # скачанный с GitHub файл — с переводами строк LF
           tr -d '\r' < "$GITHUB_WORKSPACE/update-ye-studio.cmd" > update-ye-studio.cmd
       - name: Двойной щелчок
-        shell: cmd
+        shell: pwsh
         env:
           YE_NO_PAUSE: "1"
-        run: cmd /c "%RUNNER_TEMP%\Мой Ye-Studio\update-ye-studio.cmd"
+        run: cmd /c (Join-Path $env:RUNNER_TEMP 'Мой Ye-Studio\update-ye-studio.cmd')
       - name: Проверка
         run: |
           set -e
@@ -56,12 +56,32 @@ jobs:
           git -C "$RUNNER_TEMP/Ye-Studio.git" show "$L:d.txt" | grep -q новый
           git -C "$RUNNER_TEMP/Ye-Studio.git" show "$M:c.txt" | grep -q "мой коммит"
       - name: Второй запуск
-        shell: cmd
+        shell: pwsh
         env:
           YE_NO_PAUSE: "1"
-        run: cmd /c "%RUNNER_TEMP%\Мой Ye-Studio\update-ye-studio.cmd"
+        run: cmd /c (Join-Path $env:RUNNER_TEMP 'Мой Ye-Studio\update-ye-studio.cmd')
       - name: После второго запуска — без новых веток и правок
         run: |
           cd "$RUNNER_TEMP/Ye-Studio.git"
           test "$(git branch | wc -l)" -eq 3 || { git branch; exit 1; }
           cd "$RUNNER_TEMP/Мой Ye-Studio"; test -z "$(git status --porcelain)"
+      # проект, скачанный архивом (без .git): скрипт берёт свежую копию с GitHub в Документы\GitHub\Ye-Studio
+      - name: Папка без .git
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/Дом/Downloads/Ye-Studio-архив" "$RUNNER_TEMP/Дом/Documents"
+          tr -d '\r' < "$GITHUB_WORKSPACE/update-ye-studio.cmd" > "$RUNNER_TEMP/Дом/Downloads/Ye-Studio-архив/update-ye-studio.cmd"
+      - name: Двойной щелчок в папке без .git
+        shell: pwsh
+        env:
+          YE_NO_PAUSE: "1"
+        run: |
+          $env:USERPROFILE = Join-Path $env:RUNNER_TEMP 'Дом'
+          cmd /c (Join-Path $env:RUNNER_TEMP 'Дом\Downloads\Ye-Studio-архив\update-ye-studio.cmd')
+      - name: Свежая копия на месте
+        shell: bash
+        run: |
+          D="$RUNNER_TEMP/Дом/Documents/GitHub/Ye-Studio"
+          test "$(git -C "$D" rev-parse --abbrev-ref HEAD)" = main
+          test -f "$D/app/package.json"
+          test -d "$D/app/node_modules" || { echo "npm install не прошёл"; exit 1; }

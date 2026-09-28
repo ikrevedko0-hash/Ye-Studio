@@ -1,5 +1,6 @@
-@set "YE_DIR=%~dp0" & set "YE_SELF=%~nx0" & powershell -NoProfile -ExecutionPolicy Bypass -Command "$s = Get-Content -LiteralPath '%~f0' -Raw -Encoding UTF8; iex ($s.Substring($s.IndexOf('#'+'PS#') + 4))"
+@set "YE_DIR=%~dp0" & set "YE_SELF=%~nx0" & powershell -NoProfile -ExecutionPolicy Bypass -Command "$s = Get-Content -LiteralPath '%~f0' -Raw -Encoding UTF8; iex ($s.Substring($s.IndexOf('#'+'PS#') + 4))" && exit /b 0 || exit /b 1
 @exit /b
+@rem Всё для cmd — в первой строке: скрипт обновляет и сам этот файл, а cmd дочитывает файл по ходу работы.
 #PS#
 # Обновить Ye-Studio на этом компьютере с GitHub — двойным щелчком, без агента и без GitHub Desktop.
 #  1. Несохранённые правки (и коммиты, которых нет на GitHub) — в отдельную ветку local-after-release-<дата>,
@@ -29,11 +30,21 @@ try {
   $cands = @($env:YE_DIR, "$env:USERPROFILE\Documents\GitHub\Ye-Studio", "$env:USERPROFILE\Documents\Ye-Studio",
     "$env:USERPROFILE\Desktop\Ye-Studio", "$env:USERPROFILE\source\repos\Ye-Studio", "$env:USERPROFILE\Ye-Studio")
   $repo = $cands | Where-Object { $_ -and (Test-Path -LiteralPath (Join-Path $_ '.git')) } | Select-Object -First 1
-  while (-not $repo) {
-    Say 'Не нашёл папку Ye-Studio сама. Проще всего — положить этот файл в папку Ye-Studio и запустить оттуда.' Yellow
-    $p = (Read-Host 'Или вставьте сюда путь к папке Ye-Studio (там, где папка app)').Trim('"', ' ')
-    if (-not $p) { Finish 1 }
-    if (Test-Path -LiteralPath (Join-Path $p '.git')) { $repo = $p } else { Say "В «$p» нет проекта (.git)." Red }
+  if (-not $repo) {
+    # проект не из git (скачан архивом) или лежит не там — берём свежую копию с GitHub рядом, старая папка остаётся
+    $fresh = Join-Path $env:USERPROFILE 'Documents\GitHub\Ye-Studio'
+    Say 'Не нашёл папку проекта, связанную с GitHub (в ней должна быть скрытая папка .git).' Yellow
+    Say "Скачаю свежую копию Ye-Studio с GitHub в $fresh — ваши старые папки не трогаю." Yellow
+    if (-not $env:YE_NO_PAUSE) { $a = Read-Host 'Enter — скачать, или вставьте путь к своей папке Ye-Studio'; $a = $a.Trim('"', ' ') } else { $a = '' }
+    if ($a -and (Test-Path -LiteralPath (Join-Path $a '.git'))) { $repo = $a }
+    elseif ($a) { Say "В «$a» нет .git — скачиваю свежую копию." Yellow }
+    if (-not $repo) {
+      if (Test-Path -LiteralPath $fresh) { Say "Папка $fresh уже есть, но без .git — переименуйте её и запустите снова." Red; Finish 1 }
+      New-Item -ItemType Directory -Force -Path (Split-Path $fresh) | Out-Null
+      G clone "https://github.com/ikrevedko0-hash/Ye-Studio.git" $fresh
+      $repo = $fresh
+      Say "Готова свежая копия: $fresh. Если в старой папке были свои правки — скажите Claude, где она, он перенесёт." Cyan
+    }
   }
   Set-Location -LiteralPath $repo
   $origin = Gq remote get-url origin
