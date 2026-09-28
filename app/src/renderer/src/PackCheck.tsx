@@ -4,7 +4,6 @@
 
 import { useMemo, useState } from "react";
 import { checkPack, type CheckIssue } from "../../core/siq/check";
-import { findOptionsSqueeze } from "../../core/siq/optionsLayout";
 import type { DupHit, DupReport } from "../../core/siq/dupCheck";
 import type { PackDTO } from "../../shared/api";
 
@@ -22,7 +21,7 @@ const baseDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString
 /** Результат живёт в App: окно закрывается при переходе к вопросу, а сверка с сервером не должна пропадать. */
 export interface DupState { report?: DupReport; exclude: number[]; error?: string; busy?: boolean }
 
-export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onSigameRun, onOptionsReplic, onClose }: {
+export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onSigameRun, onClose }: {
   pack: PackDTO;
   dups: DupState;
   setDups(d: DupState): void;
@@ -31,12 +30,9 @@ export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onS
   onSigame(): void;
   /** «Прогнать в SIGame» — сыграть пак настоящим движком и посмотреть глазами игроков. */
   onSigameRun(): void;
-  /** Текст вопросов с вариантами и картинкой — репликой ведущего (core/siq/optionsLayout.ts). */
-  onOptionsReplic(): void;
   onClose(): void;
 }) {
   const issues = useMemo(() => checkPack(pack.pkg, pack.media), [pack]);
-  const squeezed = useMemo(() => findOptionsSqueeze(pack.pkg).length, [pack]);
   const errors = issues.filter((i) => i.level === "error").length;
   const warns = issues.filter((i) => i.level === "warn").length;
 
@@ -52,12 +48,7 @@ export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onS
           <button className="icon" onClick={onClose} title="Закрыть">×</button>
         </header>
         {issues.length === 0 && <p className="pc-empty">Всё чисто — можно играть и выкладывать.</p>}
-        {squeezed > 0 && (
-          <p className="pc-fix">
-            <button className="primary" onClick={onOptionsReplic}>Сделать текст репликой ведущего — вопросов: {squeezed}</button>{" "}
-            <span className="pc-note">В вопросах с вариантами и картинкой текст переедет в строку ведущего над столом — картинка станет больше половины экрана, кнопки компактнее.</span>
-          </p>
-        )}
+
         <ul className="pc-list">
           {issues.map((i, k) => (
             <li key={k} className={`pc-${i.level}`}>

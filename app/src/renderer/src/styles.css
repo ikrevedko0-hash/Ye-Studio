@@ -944,7 +944,6 @@ label.secs input:disabled { opacity: .5; }
 .pc-ok { color: var(--ready); font-weight: 600; }
 .pc-warn-text { color: var(--draft); font-weight: 600; }
 .pc-note { color: var(--muted); font-size: 12px; }
-.pc-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
 .pc-dups { flex: none; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .pc-dups > header { display: flex; align-items: center; gap: 10px; }
 .pc-dup-error { color: var(--danger); margin: 0; }

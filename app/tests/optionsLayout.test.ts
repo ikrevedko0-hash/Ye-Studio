@@ -40,10 +40,10 @@ describe("варианты ответа против картинки", () => {
     expect(optionsTextToReplic(fixed)).toBe(0);
   });
 
-  it("в проверке пака — внимание с переходом к вопросу", () => {
+  it("в проверке пака — совет с переходом к вопросу (правится само при сохранении)", () => {
     const issues = checkPack(p, []).filter((i) => i.text.startsWith("Вопрос с вариантами"));
     expect(issues.map((i) => i.at)).toEqual([0, 1, 6].map((question) => ({ round: 0, theme: 0, question })));
-    expect(issues[0].level).toBe("warn");
+    expect(issues[0].level).toBe("info");
     expect(optionsSqueezeVisual(p.rounds![0].themes![0].questions![2])).toBe(false);
   });
 });
