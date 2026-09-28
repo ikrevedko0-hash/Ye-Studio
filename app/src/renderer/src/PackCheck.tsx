@@ -21,13 +21,15 @@ const baseDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString
 /** Результат живёт в App: окно закрывается при переходе к вопросу, а сверка с сервером не должна пропадать. */
 export interface DupState { report?: DupReport; exclude: number[]; error?: string; busy?: boolean }
 
-export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onClose }: {
+export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onSigameRun, onClose }: {
   pack: PackDTO;
   dups: DupState;
   setDups(d: DupState): void;
   onGo(at: NonNullable<CheckIssue["at"]>): void;
   onPackSize(): void;
   onSigame(): void;
+  /** «Прогнать в SIGame» — сыграть пак настоящим движком и посмотреть глазами игроков. */
+  onSigameRun(): void;
   onClose(): void;
 }) {
   const issues = useMemo(() => checkPack(pack.pkg, pack.media), [pack]);
@@ -61,6 +63,9 @@ export function PackCheck({ pack, dups, setDups, onGo, onPackSize, onSigame, onC
         <DupSection pack={pack} dups={dups} setDups={setDups} onGo={onGo} />
         <footer>
           <button onClick={onPackSize}>Объём пака…</button>
+          <button onClick={onSigameRun} title="Сыграть каждый вопрос настоящим движком SIGame и показать, как его увидят игроки на телефоне и компьютере">
+            Прогнать в SIGame…
+          </button>
           <span className="spacer" />
           <button className="primary" onClick={onSigame} title="Сохранить, запустить SIGame и положить путь к паку в буфер обмена">
             Открыть в SIGame

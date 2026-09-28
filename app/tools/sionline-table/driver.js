@@ -72,14 +72,35 @@
     document.querySelectorAll("video").forEach(function (v) { if (v.src && !v.error && v.readyState < 2) n++; });
     return n;
   }
-  /** Ждём, пока догрузятся картинки и видео (не дольше maxMs), и ещё quietMs на анимации появления. */
+  // Последнее изменение состава страницы: узлы и текст (атрибуты не считаем — полоски таймеров
+  // SIOnline меняют style постоянно). Табло → вопрос SIOnline показывает анимацией, снимать надо после неё.
+  var lastChange = Date.now();
+  new MutationObserver(function () { lastChange = Date.now(); })
+    .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+
+  /**
+   * Ждём, пока догрузятся картинки и видео и стол перестанет перестраиваться (quietMs без изменений),
+   * но не дольше maxMs.
+   */
+  /** На столе уже содержимое вопроса, а не табло/заставка (SIOnline переключает их с анимацией). */
+  function contentShown() {
+    var sel = "img.inGameImg, video, .answerOption, .tableContent .tableText, .layout__content .tableText";
+    var list = document.querySelectorAll(sel);
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i].getBoundingClientRect();
+      if (r.width > 1 && r.height > 1 && !list[i].closest(".roundTable")) return true;
+    }
+    return false;
+  }
+
   ye.settle = function (maxMs, quietMs) {
     var start = Date.now();
     return new Promise(function (resolve) {
       (function tick() {
-        var left = pending();
-        if (left === 0 || Date.now() - start > maxMs) {
-          setTimeout(function () { resolve({ waitedMs: Date.now() - start, stillLoading: pending() }); }, quietMs);
+        var now = Date.now();
+        var calm = contentShown() && pending() === 0 && now - lastChange >= quietMs;
+        if (calm || now - start > maxMs) {
+          resolve({ waitedMs: now - start, stillLoading: pending() });
         } else setTimeout(tick, 50);
       })();
     });

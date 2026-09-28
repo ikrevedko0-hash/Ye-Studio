@@ -201,7 +201,8 @@ export function mergeShotIssues(at: At, list: { issue: RawIssue; profile: Profil
       if (!g.profiles.includes(profile)) g.profiles.push(profile);
     }
   }
-  return [...groups.values()].map(({ best, profiles }) => ({
+  const rank = (p: ProfileId) => PROFILES.findIndex((x) => x.id === p);
+  return [...groups.values()].map(({ best, profiles }) => ({ best, profiles: profiles.sort((a, b) => rank(a) - rank(b)) })).map(({ best, profiles }) => ({
     level: best.level,
     text: `${best.text} — ${profiles.length > 1 ? "экраны" : "экран"}: ${profiles.map((p) => `«${PROFILE_TITLE[p]}»`).join(", ")}`,
     at, profiles, source: best.source,
@@ -255,7 +256,12 @@ export function buildReport(input: ReportInput, profiles: Profile[] = PROFILES):
   }
 
   const qs = [...questions.values()].sort((a, b) => a.at.round - b.at.round || a.at.theme! - b.at.theme! || a.at.question! - b.at.question!);
-  for (const q of qs) q.issues.push(...mergeShotIssues(q.at, raw.get(key(q.at)) ?? []));
+  const order = new Map(profiles.map((p, i) => [p.id, i]));
+  for (const q of qs) {
+    q.issues.push(...mergeShotIssues(q.at, raw.get(key(q.at)) ?? []));
+    // снимки идут в порядке готовности — показываем всегда одинаково: экран, потом вопрос → ответ
+    q.shots.sort((a, b) => (order.get(a.profile) ?? 9) - (order.get(b.profile) ?? 9) || (a.part === b.part ? 0 : a.part === "question" ? -1 : 1) || a.n - b.n);
+  }
   const all = [...issues, ...qs.flatMap((q) => q.issues)].sort((a, b) => ORDER[a.level] - ORDER[b.level]);
 
   const played = input.done?.played ?? qs.filter((q) => !q.issues.some((i) => i.text.startsWith("Игра не доиграла"))).length;

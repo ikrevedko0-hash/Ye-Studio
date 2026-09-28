@@ -9,7 +9,8 @@ export default {
   // setup-файла не доходит): «выживают» все, счёт около 1%. Поэтому командный раннер: Stryker сам
   // передаёт номер мутанта переменной __STRYKER_ACTIVE_MUTANT__, тесты гоняются целиком (~6 с).
   testRunner: "command",
-  commandRunner: { command: "npx vitest run --no-isolate --bail=1 --reporter=dot" },
+  // sigameRunner.test.ts играет паки настоящим SIGame (~1 мин) и core/siq не проверяет — мимо
+  commandRunner: { command: "npx vitest run --no-isolate --bail=1 --reporter=dot --exclude tests/sigameRunner.test.ts" },
   mutate: [
     "src/core/siq/xml.ts",
     "src/core/siq/zip.ts",

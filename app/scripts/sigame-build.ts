@@ -3,7 +3,9 @@
 //   table/  — комната SIOnline (tools/sionline-table/YeRoom.tsx) + страница-драйвер
 // Исходники берутся из app/.sigame-src (npm run sigame-src), коммиты — tools/sigame-runner/versions.json.
 //
-// npm run sigame-build [-- --rid win-x64] [--out папка] [--zip файл.zip]
+// npm run sigame-build [-- --rid win-x64] [--out папка] [--zip-dir папка]
+// --zip-dir: ещё и архивы для «Компонентов» — sigame-runner-<rid>.zip и sigame-table.zip
+// (установщик распаковывает архив в одну папку, без подпапок: runner/ и table/ — два архива).
 
 import { execFileSync } from "node:child_process";
 import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -14,7 +16,7 @@ const args = process.argv.slice(2);
 const opt = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 const rid = opt("--rid") ?? (process.platform === "win32" ? "win-x64" : process.platform === "darwin" ? "osx-x64" : "linux-x64");
 const out = resolve(opt("--out") ?? join(app, ".sigame-src", "build", "sigame"));
-const zip = opt("--zip");
+const zipDir = opt("--zip-dir");
 const src = join(app, ".sigame-src");
 const si = join(src, "SI");
 const sio = join(src, "SIOnline");
@@ -31,7 +33,7 @@ mkdirSync(out, { recursive: true });
 
 // ---------- стенд ----------
 run("dotnet", ["publish", join(app, "tools", "sigame-runner", "sigame-runner.csproj"), "-c", "Release", "-r", rid, "--self-contained", "true",
-  "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:DebugType=none", `-p:SIRoot=${si}`, "-o", join(out, "runner")], app);
+  "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:EnableCompressionInSingleFile=true", "-p:DebugType=none", "-p:GenerateDocumentationFile=false", `-p:SIRoot=${si}`, "-o", join(out, "runner")], app);
 copyFileSync(join(si, "LICENSE"), join(out, "runner", "LICENSE-SIGame.txt"));
 
 // ---------- стол ----------
@@ -59,10 +61,14 @@ cpSync(join(app, "tools", "sigame-runner", "versions.json"), join(out, "versions
 
 console.log(`\nГотово: ${out}`);
 
-if (zip) {
-  const z = resolve(zip);
-  rmSync(z, { force: true });
-  if (win) run("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path '${out}\\*' -DestinationPath '${z}'`], app);
-  else run("zip", ["-qr", z, "."], out);
-  console.log(`Архив: ${z}`);
+if (zipDir) {
+  const dir = resolve(zipDir);
+  mkdirSync(dir, { recursive: true });
+  for (const [name, from] of [[`sigame-runner-${rid}.zip`, "runner"], ["sigame-table.zip", "table"]] as const) {
+    const z = join(dir, name);
+    rmSync(z, { force: true });
+    if (win) run("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path '${join(out, from)}\\*' -DestinationPath '${z}'`], app);
+    else run("zip", ["-qr", z, "."], join(out, from));
+    console.log(`Архив: ${z}`);
+  }
 }

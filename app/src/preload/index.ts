@@ -12,6 +12,14 @@ const api: Api = {
   draftDiscard: () => ipcRenderer.invoke("draft:discard"),
   openBackups: () => ipcRenderer.invoke("backups:open"),
   openInSigame: (packPath) => ipcRenderer.invoke("sigame:open", packPath),
+  sigameRunReady: () => ipcRenderer.invoke("sigame:runReady"),
+  sigameRun: (packPath) => ipcRenderer.invoke("sigame:run", packPath),
+  sigameRunCancel: () => ipcRenderer.invoke("sigame:runCancel"),
+  onSigameProgress: (cb) => {
+    const h = (_e: unknown, p: Parameters<typeof cb>[0]) => cb(p);
+    ipcRenderer.on("sigame:progress", h);
+    return () => { ipcRenderer.off("sigame:progress", h); };
+  },
   pickTargetPack: (path) => ipcRenderer.invoke("theme:pickPack", path),
   transferTheme: (theme, to) => ipcRenderer.invoke("theme:transfer", theme, to),
   copyTheme: (theme, final, from) => ipcRenderer.invoke("theme:copy", theme, final, from),

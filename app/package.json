@@ -33,7 +33,8 @@
     "sigame-src": "tsx scripts/sigame-src.ts",
     "sigame-build": "tsx scripts/sigame-build.ts",
     "sigame-e2e": "tsx scripts/sigame-e2e.ts",
-    "e2e-fixtures": "tsx scripts/e2e-fixtures.ts"
+    "e2e-fixtures": "tsx scripts/e2e-fixtures.ts",
+    "sigame-manifest": "tsx scripts/sigame-manifest.ts"
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",

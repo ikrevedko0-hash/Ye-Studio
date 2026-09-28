@@ -125,7 +125,7 @@ async function renderRound(o: SigameRunOptions, profile: Profile, r: RoundEvent,
       if (o.signal?.aborted) break;
       await page.feed(toFeed(r.messages.slice(fed, screen.at + 1)));
       fed = screen.at + 1;
-      const settle = await page.settle(o.mediaWaitMs ?? 12000, 450);
+      const settle = await page.settle(o.mediaWaitMs ?? 12000, 600);
       const measure = await page.measure();
       const q = r.questions[screen.question];
       const file = join(o.outDir, `r${r.round}-t${q.theme}-q${q.question}-${screen.part}${screen.n}-${profile.id}.jpg`);

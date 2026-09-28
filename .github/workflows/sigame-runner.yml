@@ -1,0 +1,97 @@
+name: sigame-runner
+
+# «Прогон в SIGame»: собрать стенд (движок SIGame) и стол SIOnline с закреплённых коммитов,
+# прогнать паки-фикстуры настоящей игрой, а по кнопке — выложить архивы для «Компонентов» в релиз.
+# После выпуска: npm run sigame-manifest -- --tag <тег> --dir <скачанные архивы> и закоммитить components.json.
+
+on:
+  push:
+    paths:
+      - "app/tools/sigame-runner/**"
+      - "app/tools/sionline-table/**"
+      - "app/src/core/sigame/**"
+      - "app/scripts/sigame-*.ts"
+      - "app/tests/fixtures/e2e/**"
+      - ".github/workflows/sigame-runner.yml"
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Выложить архивы win-x64 в релиз"
+        type: boolean
+        default: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run sigame-src
+      - run: npm run sigame-build -- --rid linux-x64
+      # стенд на фикстурах: что говорит сам движок SIGame
+      - run: npx vitest run tests/sigameRunner.test.ts
+      # целиком, со столом SIOnline в Chromium: пустой <info /> и неудобные имена — ошибки (код 1), остальное — чисто
+      - run: npx playwright-core install --with-deps chromium
+      - name: Прогон фикстур
+        run: |
+          set +e
+          SIGAME_E2E_CHROMIUM="$(node -e "console.log(require('playwright-core').chromium.executablePath())")" \
+            npx tsx scripts/sigame-e2e.ts tests/fixtures/e2e/good.siq tests/fixtures/e2e/tiny-image-options.siq --out reports/sigame
+          test $? -eq 0 || { echo "чистые фикстуры дали ошибки"; exit 1; }
+          SIGAME_E2E_CHROMIUM="$(node -e "console.log(require('playwright-core').chromium.executablePath())")" \
+            npx tsx scripts/sigame-e2e.ts tests/fixtures/e2e/empty-info.siq tests/fixtures/e2e/bad-names.siq --out reports/sigame
+          test $? -eq 1 || { echo "сломанные фикстуры должны дать ошибки"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sigame-e2e-report
+          path: app/reports/sigame
+
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    needs: e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: app
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run sigame-src
+      # win-x64 собирается и на Linux: стенд самодостаточный, без нативной компиляции
+      - run: npm run sigame-build -- --rid win-x64 --zip-dir dist-sigame
+      - name: Релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(node -p "require('./tools/sigame-runner/versions.json').SI.version")
+          O=$(node -p "require('./tools/sigame-runner/versions.json').SIOnline.commit.slice(0,7)")
+          TAG="sigame-$V-$O"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "Прогон в SIGame $V (SIOnline $O)" --notes "Движок SIGame $V и стол SIOnline $O для «Прогона в SIGame». Лицензии: SIGame — MIT, SIOnline — GPL-3.0."
+          gh release upload "$TAG" dist-sigame/*.zip --clobber
+          echo "Дальше: npm run sigame-manifest -- --tag $TAG --dir <архивы>"

@@ -20,6 +20,7 @@ import { enableEditMenu } from "./editMenu";
 import { upscaleImage, upscalerReady } from "./upscale";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
 import { findSigame, launchSigame } from "./sigame";
+import { cancelSigameRun, runFile, runSigameInApp, sigameInstalled } from "./sigameRun";
 import { cleanupCode, initUpdater } from "./updater";
 import { appVersion, boot } from "./version"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
@@ -828,6 +829,10 @@ function registerIpc() {
     launchSigame(exe);
     return { ok: true as const };
   });
+  // «Прогнать в SIGame»: окно сначала сохраняет пак, прогресс — событиями sigame:progress
+  ipcMain.handle("sigame:runReady", () => !!sigameInstalled());
+  ipcMain.handle("sigame:run", (e, packPath: string) => runSigameInApp(packPath, (p) => e.sender.send("sigame:progress", p)));
+  ipcMain.handle("sigame:runCancel", () => cancelSigameRun());
   ipcMain.handle("backups:open", async () => { await mkdir(BACKUP_DIR(), { recursive: true }); return shell.openPath(BACKUP_DIR()); });
 
   ipcMain.handle("media:add", async (_e, paths?: string[]) => {
@@ -1534,6 +1539,14 @@ function registerMediaProtocol() {
     const url = new URL(req.url);
     // siq://lib/<имя> — оригинал из библиотеки мастерской, он лежит на диске, а не в паке
     if (url.host === "lib") return libraryResponse(decodeURIComponent(url.pathname.slice(1)), req.headers.get("range"));
+    // siq://sigame/<прогон>/<снимок> — снимки «Прогона в SIGame»
+    if (url.host === "sigame") {
+      const [, run, name] = url.pathname.split("/").map(decodeURIComponent);
+      const file = run && name ? runFile(run, name) : null;
+      if (!file) return new Response("not found", { status: 404 });
+      try { return new Response(new Uint8Array(await readFile(file)), { headers: { "content-type": "image/jpeg" } }); }
+      catch { return new Response("not found", { status: 404 }); }
+    }
     const [, folderEnc, nameEnc] = url.pathname.split("/");
     const m = doc.media.get(key(decodeURIComponent(folderEnc ?? ""), decodeURIComponent(nameEnc ?? "")));
     if (!m) return new Response("not found", { status: 404 });
@@ -1578,6 +1591,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --assistant-setup=1 [--shot=<png>] мастер «🤝 Помощник» (Claude / ChatGPT): открыть без пака и снять, ничего не ставить;
  *   --components-panel=1            с --selftest: открыть «🧩 Компоненты», напечатать машину и профили (снимок — --shot);
  *   --system-probe=1                 проверка системы без пака: видеокарта, память, диск, программы, профиль модели;
+ *   --sigame-run=<siq>               «Прогон в SIGame» в скрытых окнах: печатает отчёт (беды, снимки) и выходит;
+ *   --sigame-ui=<png> --selftest=<siq>  «Автопроверка пака» → «Прогнать в SIGame…» → «Прогнать», ждёт отчёт, снимает окно;
  *   --game-preview=1 [--game-preview-shot=<png>]  нажать «▶ Как в игре» во 2-м вопросе, пройти экраны, снять кадры;
  *   --point-test=<папка>             ответ точкой: первый point-вопрос пака — круг, щелчок, допуск, «Как в игре» мимо и в точку;
  *   --pixelate-test=<блоков> [--pixelate-shot=<png>]  «Картина по пикселям» на первой картинке вопроса: размеры, цветов не больше блоков, применить;
@@ -1655,7 +1670,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -2002,6 +2017,36 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     }
   }
   // Объём пака: открыть «📦 N МБ», убрать неиспользуемое, ужать картинки; печатает до/после (копию — через --save-copy).
+  const sigameShot = arg("sigame-ui");
+  if (data && sigameShot) {
+    const res = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const until = async (f, ms = 8000) => { for (let t = 0; t < ms; t += 100) { const v = f(); if (v) return v; await wait(100); } return null; };
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      const check = await until(() => byText("button", "Автопроверка пака"), 20000);
+      if (!check) return { ошибка: "нет кнопки «Автопроверка пака»" };
+      check.click();
+      const open = await until(() => byText(".pack-check button", "Прогнать в SIGame"));
+      if (!open) return { ошибка: "нет кнопки «Прогнать в SIGame…»" };
+      open.click();
+      const go = await until(() => byText(".sigame-run footer button", "Прогнать"));
+      if (!go) return { ошибка: "окно прогона не открылось" };
+      await until(() => !go.disabled, 3000);
+      go.click();
+      await until(() => document.querySelector(".sigame-run .sr-summary") || document.querySelector(".sigame-run .pc-dup-error"), 600000);
+      const cb = document.querySelector(".sr-filter input");
+      if (cb && cb.checked) cb.click();
+      await wait(1500);
+      const box = document.querySelector(".sigame-run");
+      return { текст: box.innerText.replace(/\\s+/g, " ").slice(0, 1500), снимков: box.querySelectorAll(".sr-shots img").length,
+        загружено: [...box.querySelectorAll(".sr-shots img")].filter((i) => i.complete && i.naturalWidth > 0).length };
+    })()`);
+    console.log("САМОПРОВЕРКА окна прогона в SIGame:", JSON.stringify(res, null, 1));
+    win.webContents.invalidate();
+    await new Promise((r) => setTimeout(r, 500));
+    await writeFile(sigameShot, (await win.webContents.capturePage()).toPNG());
+    if (res.ошибка || !res.загружено) process.exitCode = 1;
+  }
   if (data && arg("pack-size")) {
     const res = await win.webContents.executeJavaScript(`(async () => {
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -3527,6 +3572,13 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА системы упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
+  if (arg("sigame-run")) {
+    // «Прогон в SIGame» без окна: движок SIGame + стол SIOnline в скрытых окнах, отчёт — в консоль
+    void runSigameInApp(arg("sigame-run")!, (p) => console.log(`  ${p.stage}: ${p.text}`))
+      .then(({ run, report }) => console.log("САМОПРОВЕРКА прогона в SIGame:", run, JSON.stringify({ ...report, questions: report.questions.map((q) => ({ at: q.at, shots: q.shots.length, issues: q.issues.map((i) => i.text) })) }, null, 1)))
+      .catch((e) => { console.error("САМОПРОВЕРКА прогона в SIGame упала:", e); process.exitCode = 1; })
+      .finally(() => app.quit());
+  }
   if (arg("yt-login-test")) {
     void syncWindowRoute()
       .then(() => probeLoginPage(arg("yt-login-shot")))
@@ -3534,7 +3586,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;

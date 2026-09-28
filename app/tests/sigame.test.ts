@@ -251,9 +251,13 @@ describe("отчёт целиком", () => {
     const r = buildReport({
       open: { ok: true, file: { rounds: 1, themes: 1, questions: 1 } },
       missing: [], rounds: [round()],
-      shots: [{ ...shot(m), file: "a.jpg" }, { ...shot(m, "pc"), file: "b.jpg" }],
+      shots: [{ ...shot(m, "pc"), file: "b.jpg" }, { ...shot(m), screen: { question: 0, at: 2, part: "answer", n: 1 }, file: "c.jpg" }, { ...shot(m), file: "a.jpg" }],
     });
-    expect(r.questions[0].shots).toEqual([{ profile: "phone", part: "question", n: 1, file: "a.jpg" }, { profile: "pc", part: "question", n: 1, file: "b.jpg" }]);
+    expect(r.questions[0].shots).toEqual([
+      { profile: "phone", part: "question", n: 1, file: "a.jpg" },
+      { profile: "phone", part: "answer", n: 1, file: "c.jpg" },
+      { profile: "pc", part: "question", n: 1, file: "b.jpg" },
+    ]);
     expect(r.questions[0].issues).toHaveLength(1);
     expect(r.questions[0].issues[0].text).toMatch(/^Картинка флаг\.png \(10×10\) растянута до 346×346 — в 34\.6 раза.*экраны: «Телефон», «Компьютер»$/);
     expect(r.issues).toEqual(r.questions[0].issues);

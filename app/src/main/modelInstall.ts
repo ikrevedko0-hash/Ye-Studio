@@ -251,7 +251,7 @@ export async function removeModel(componentsDir: string, baseDir: string): Promi
 export const YTDLP_DIR = "yt-dlp";
 
 /** Главный файл программы-компонента: по нему решаем «стоит». Папка программы — её id. */
-export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe" };
+export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe", sigame: "runner/sigame-runner.exe" };
 
 export function toolInstalled(componentsDir: string, tool: string): boolean {
   return existsSync(join(componentsDir, tool, TOOL_MAIN[tool] ?? ""));
