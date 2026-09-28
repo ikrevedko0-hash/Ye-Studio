@@ -33,11 +33,6 @@ function playwrightTable(browser: Browser): TableBrowser {
         deviceScaleFactor: profile.scale, isMobile: profile.mobile, hasTouch: profile.mobile,
       });
       const page = await ctx.newPage();
-      if (profile.network) {
-        const cdp = await ctx.newCDPSession(page);
-        await cdp.send("Network.enable");
-        await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: profile.network.latencyMs, downloadThroughput: profile.network.downBytesPerSec, uploadThroughput: profile.network.downBytesPerSec });
-      }
       await page.goto(pathToFileURL(paths.table).href);
       await page.waitForFunction(() => (window as unknown as { __ye?: { ready: boolean } }).__ye?.ready === true, undefined, { timeout: 30000 });
       type Ye = { feed(m: unknown): void; settle(a: number, b: number): Promise<{ waitedMs: number; stillLoading: number }>; measure(): unknown };

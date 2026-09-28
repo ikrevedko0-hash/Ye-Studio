@@ -367,10 +367,10 @@ sealed class RoundRun(int Index, SIDocument Doc, MediaServer Server, Structure S
         {
             while (!cts.IsCancellationRequested)
             {
-                await Task.Delay(100);
+                await Task.Delay(20);
                 lock (_lock)
                 {
-                    if ((DateTime.UtcNow - _lastMessage).TotalMilliseconds > 200)
+                    if ((DateTime.UtcNow - _lastMessage).TotalMilliseconds > 50)
                     {
                         Send(showman, Messages_.Move, 1);
                         _lastMessage = DateTime.UtcNow;

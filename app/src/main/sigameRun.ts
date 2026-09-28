@@ -69,10 +69,6 @@ function electronTable(tableHtml: string): TableBrowser {
       const cdp = (method: string, params?: object) => wc.debugger.sendCommand(method, params);
       await cdp("Emulation.setDeviceMetricsOverride", { width: profile.width, height: profile.height, deviceScaleFactor: profile.scale, mobile: profile.mobile });
       if (profile.mobile) await cdp("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
-      if (profile.network) {
-        await cdp("Network.enable");
-        await cdp("Network.emulateNetworkConditions", { offline: false, latency: profile.network.latencyMs, downloadThroughput: profile.network.downBytesPerSec, uploadThroughput: profile.network.downBytesPerSec });
-      }
       const started = Date.now();
       while (!(await wc.executeJavaScript("!!(window.__ye && window.__ye.ready)"))) {
         if (Date.now() - started > 30000) throw new Error("стол SIOnline не запустился за 30 с");

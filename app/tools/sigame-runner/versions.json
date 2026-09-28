@@ -1,6 +1,6 @@
 {
   "_": "Закреплённые коммиты исходников SIGame. Поменяли их или код стенда (Program.cs, стол) — поднимите runner и выпустите компонент заново (workflow sigame-runner, галочка release): у каждого выпуска свой тег, старые архивы не перезаписываются.",
-  "runner": 2,
+  "runner": 3,
   "SI": { "repo": "https://github.com/VladimirKhil/SI", "commit": "1c95359f282f22be7b313c55c00d5f8bd47531d7", "version": "7.13.12" },
   "SIOnline": { "repo": "https://github.com/VladimirKhil/SIOnline", "commit": "c94254f99444a0d96070ef63fc09dd4f39ef338c" }
 }
