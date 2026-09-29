@@ -17,6 +17,7 @@
   GET  /api/review/packs, /api/review/pack/<пак>, /api/review/board/<пак>
   POST /api/review                              — порция ответов игрока
   GET  /api/review/export/<пак>                 — выгрузка для автора (заголовок X-Review-Admin)
+  GET  /api/review/installs                     — сводка по установкам без id и ip (тот же заголовок X-Review-Admin)
 
 Запуск:
   python3 yestudio_server.py
@@ -226,6 +227,50 @@ def touch_install(install_id: str, version: str, ip: str) -> None:
             entry = {"first": ts, "last": ts, "v": version, "ip": ip}
         data[install_id] = entry
         atomic_write_json(path, data)
+
+
+def _parse_iso(value):
+    """ISO-время (в том числе с «Z») → aware datetime в UTC или None."""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def installs_summary() -> dict:
+    """Только агрегаты по installs.json: ни id установок, ни ip наружу не идут."""
+    data = read_json_safe(os.path.join(DATA_DIR, "installs.json"), {})
+    if not isinstance(data, dict):
+        data = {}
+    now = datetime.now(timezone.utc)
+    active = {"1d": 0, "7d": 0, "30d": 0}
+    by_version: dict[str, int] = {}
+    first_by_day: dict[str, int] = {}
+    total = 0
+    for entry in data.values():
+        if not isinstance(entry, dict):
+            continue
+        total += 1
+        v = str(entry.get("v") or "?")[:32]
+        by_version[v] = by_version.get(v, 0) + 1
+        first = _parse_iso(entry.get("first"))
+        if first:
+            day = first.astimezone(timezone.utc).strftime("%Y-%m-%d")
+            first_by_day[day] = first_by_day.get(day, 0) + 1
+        last = _parse_iso(entry.get("last"))
+        if last:
+            age = (now - last).total_seconds()
+            for key, days in (("1d", 1), ("7d", 7), ("30d", 30)):
+                if age <= days * 86400:
+                    active[key] += 1
+    return {
+        "total": total,
+        "active": active,
+        "byVersion": dict(sorted(by_version.items(), key=lambda kv: -kv[1])),
+        "firstByDay": dict(sorted(first_by_day.items())),
+        "generatedAt": now_iso(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -600,6 +645,12 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(HTTPStatus.TOO_MANY_REQUESTS, "rate limit")
         if path == "/api/review/packs":
             self._send_json(HTTPStatus.OK, {"packs": store.packs()})
+            return True
+        if path == "/api/review/installs":
+            token = self.headers.get("X-Review-Admin") or ""
+            if not hmac.compare_digest(token.encode(), store.admin_token().encode()):
+                raise ApiError(HTTPStatus.FORBIDDEN, "forbidden")
+            self._send_json(HTTPStatus.OK, installs_summary())
             return True
         m = re.match(r"^/api/review/(pack|board|export)/([^/]+)$", path)
         if not m:

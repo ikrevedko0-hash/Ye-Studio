@@ -121,6 +121,35 @@ class ServerTestCase(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["install-xyz"]["v"], "2.0.0")
 
+    def test_review_installs_admin_only_and_aggregates(self):
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        iso = lambda d: (now - timedelta(days=d)).isoformat()
+        data = {
+            "secret-id-1": {"first": iso(40), "last": iso(0.5), "v": "0.2.5", "ip": "203.0.113.7"},
+            "secret-id-2": {"first": iso(10), "last": iso(5), "v": "0.2.4", "ip": "203.0.113.8"},
+            "secret-id-3": {"first": iso(50).replace("+00:00", "Z"), "last": iso(20).replace("+00:00", "Z"),
+                            "v": "0.2.4", "ip": "203.0.113.9"},
+        }
+        with open(os.path.join(self.tmp_dir, "installs.json"), "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        code, _, _ = self._get("/api/review/installs")
+        self.assertEqual(code, 403)
+        code, _, _ = self._get("/api/review/installs", headers={"X-Review-Admin": "wrong"})
+        self.assertEqual(code, 403)
+        token = self.mod.review_store().admin_token()
+        code, body, _ = self._get("/api/review/installs", headers={"X-Review-Admin": token})
+        self.assertEqual(code, 200)
+        res = json.loads(body)
+        self.assertEqual(res["total"], 3)
+        self.assertEqual(res["active"], {"1d": 1, "7d": 2, "30d": 3})
+        self.assertEqual(res["byVersion"], {"0.2.4": 2, "0.2.5": 1})
+        self.assertEqual(sum(res["firstByDay"].values()), 3)
+        self.assertIn("generatedAt", res)
+        text = body.decode()
+        for leak in ("secret-id", "203.0.113", '"ip"'):
+            self.assertNotIn(leak, text)
+
     def test_ping_forbidden_without_key(self):
         code, _, _ = self._get("/api/ping?id=abc123&v=1.0.0")
         self.assertEqual(code, 403)
