@@ -13,7 +13,7 @@ python "проверить повторы.py" <пачка вопросов.json 
 import json, pathlib, re, shutil, sys, urllib.error, urllib.parse, urllib.request, zipfile
 from xml.etree import ElementTree as ET
 
-SERVER = "http://193.233.112.48:8787"      # тот же, что в Ye!Studio (app/src/shared/server.ts)
+SERVER = "http://xn--80ajqss.xn--p1ai:8787"        # тот же, что в Ye!Studio (app/src/shared/server.ts)
 KEY = "yes-beta-2026"
 KIND = {"exact": "🔴 дословно", "media": "🔴 тот же файл", "answer": "🟠 тот же ответ"}
 FOLDER = {"image": "Images", "audio": "Audio", "voice": "Audio", "video": "Video", "html": "Html"}
