@@ -147,6 +147,7 @@ async function home() {
     <div class="sky-top"><div class="sun"></div></div>
     <h1>Айсберг Уе!паков</h1>
     <p class="sub">${esc(joke("home_sub"))}</p>
+    <p class="hint">Отвечай на что хочешь: до дна нырять не обязательно, каждый ответ сохраняется сразу.</p>
     ${TIP}</div>
     <div class="packs" id="packs"><div class="pk">Грузим паки…</div></div></div>`;
   try {
@@ -285,6 +286,7 @@ async function pack(slug) {
   <section class="lv lv-sky" id="lv0">
     <div class="sky-top"><a href="/">← все паки</a><div class="sun"></div></div>
     <div class="pack-head">${logo}<div><h1>${esc(M.title)}</h1><div class="date">${esc(M.date)} · ${nQuestions(nQ)}</div></div></div>
+    <p class="hint" style="margin:10px 0 18px">💾 Каждый ответ сохраняется сразу. Проходить весь айсберг не обязательно: ответь на что хочется и уходи, когда надоест.</p>
     ${tier("sky", "Уровень 0 · над водой")}
     <div class="rating">${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<button data-rate="${n}" class="${a.rating === n ? "on" : ""}">${n}</button>`).join("")}</div>
     <p class="say" id="say-rate"></p>
