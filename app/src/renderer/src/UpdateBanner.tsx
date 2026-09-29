@@ -6,6 +6,15 @@
 import { useEffect, useState } from "react";
 import type { UpdateStatus } from "../../shared/api";
 
+/** Первая содержательная строка заметок: без заголовков вроде «Что нового:» и маркеров списка. */
+export function headline(notes?: string): string {
+  for (const raw of (notes ?? "").split("\n")) {
+    const line = raw.replace(/^\s*[-*•]\s*/, "").trim();
+    if (line && !line.endsWith(":")) return line;
+  }
+  return "";
+}
+
 export function UpdateBanner() {
   const [status, setStatus] = useState<UpdateStatus>({ state: "idle" });
   const [dismissed, setDismissed] = useState(false);
@@ -29,7 +38,7 @@ export function UpdateBanner() {
             Доступна версия {status.version}
             {status.kind === "code" && status.sizeMb !== undefined ? ` (${String(status.sizeMb).replace(".", ",")} МБ)` : ""}
             {status.kind === "installer" ? " — новая сборка, через установщик" : ""}
-            {status.notes ? ` — ${status.notes.split("\n")[0]}` : ""}
+            {headline(status.notes) ? ` — ${headline(status.notes)}` : ""}
           </span>
           <span className="spacer" />
           <button className="primary small" onClick={() => void window.api.updateDownload()}>Скачать</button>

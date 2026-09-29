@@ -43,9 +43,18 @@ let busy = false;
 const active = (!SELF_TEST && app.isPackaged) || !!process.env.YES_UPDATE_API;
 const allowPrerelease = () => appVersion().includes("-");
 
+/** GitHub отдаёт заметки к релизу HTML-ом (`<p>…</p>`), плашке нужен простой текст. */
+function plainNotes(s: string): string {
+  return s
+    .replace(/<br\s*\/?>|<\/(p|li|h\d)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&")
+    .trim();
+}
+
 function notesOf(n: UpdateInfo["releaseNotes"]): string | undefined {
-  if (typeof n === "string") return n;
-  if (Array.isArray(n)) return n.map((x) => x.note).filter((x): x is string => !!x).join("\n\n");
+  if (typeof n === "string") return plainNotes(n);
+  if (Array.isArray(n)) return plainNotes(n.map((x) => x.note).filter((x): x is string => !!x).join("\n\n"));
   return undefined;
 }
 

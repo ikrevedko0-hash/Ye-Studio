@@ -134,8 +134,13 @@ if (!existsSync(join(setup, exe))) fail(`Не собрался ${exe}`);
 for (const f of [exe, `${exe}.blockmap`]) copyFileSync(join(setup, f), join(out, f));
 const yml = ["beta.yml", "latest.yml"].map((f) => join(setup, f)).find(existsSync) ?? fail("electron-builder не написал beta.yml / latest.yml");
 if (!readFileSync(yml, "utf8").startsWith(`version: ${version}\n`)) fail(`${yml} не для версии ${version}`);
-copyFileSync(yml, join(out, "beta.yml"));
-copyFileSync(yml, join(out, "latest.yml"));
+// releaseNotes простым текстом: без него electron-updater берёт заметки из RSS GitHub HTML-ом,
+// и старые установки показывают в плашке «<p>Что нового:</p>» (так вышло с 0.2.5).
+const headline = notes.split("\n").map((l) => l.replace(/^\s*[-*•]\s*/, "").trim()).find((l) => l && !l.endsWith(":"));
+const ymlText = readFileSync(yml, "utf8").replace(/^releaseNotes:.*\n?/m, "")
+  + (headline ? `releaseNotes: '${headline.replace(/'/g, "''")}'\n` : "");
+writeFileSync(join(out, "beta.yml"), ymlText);
+writeFileSync(join(out, "latest.yml"), ymlText);
 
 const files = [exe, `${exe}.blockmap`, gzName, "beta.yml", "latest.yml", "code.json"];
 console.log(`\nГотово в ${out}:\n  ${files.join("\n  ")}`);
