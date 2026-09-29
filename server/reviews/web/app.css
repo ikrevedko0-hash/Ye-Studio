@@ -178,7 +178,8 @@ label.fld { display: block; font-weight: 750; margin: 18px 0 8px; }
 .home .home-sky > * { max-width: 560px; margin-left: auto; margin-right: auto; }
 .home .home-sky .tip { margin-top: 4px; }
 .home h1 { font-size: clamp(30px, 9vw, 42px); line-height: 1.02; margin: 18px 0 8px; font-weight: 900; }
-.home .sub { color: var(--ink-soft); margin: 0; font-weight: 600; }
+.home .sub { color: var(--ink-soft); margin: 0 auto; font-weight: 600; }
+.home .home-sky > .hint { margin: 10px auto 0; }
 .packs { display: grid; gap: 12px; }
 .pk {
   display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 18px; text-decoration: none; color: #fff;
@@ -229,3 +230,7 @@ label.fld { display: block; font-weight: 750; margin: 18px 0 8px; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .fish { display: none; }
 }
+
+/* Колонка по центру на широком экране. Правила вида «margin: 12px 0 4px» у .pack-head, .rating, h2, .sub,
+   .say, .q-title, .hint сбрасывали auto-отступы из «.lv > *», и на компьютере часть блоков уезжала влево. */
+.lv > *, .home .home-sky > * { margin-left: auto !important; margin-right: auto !important; }
