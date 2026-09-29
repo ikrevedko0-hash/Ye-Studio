@@ -150,6 +150,62 @@ class ServerTestCase(unittest.TestCase):
         for leak in ("secret-id", "203.0.113", '"ip"'):
             self.assertNotIn(leak, text)
 
+    def _admin(self):
+        return {"X-Review-Admin": self.mod.review_store().admin_token()}
+
+    def test_review_errors_admin_only_and_groups(self):
+        for path in ("/api/review/errors", "/api/review/feedback", "/api/review/feedback/x/log"):
+            self.assertEqual(self._get(path)[0], 403)
+            self.assertEqual(self._get(path, headers={"X-Review-Admin": "wrong"})[0], 403)
+        items = [{"ts": "2026-09-25T00:00:00Z", "where": "main", "kind": "TypeError",
+                  "message": "boom\nвторая строка", "stack": "s" * 5000}]
+        for install, ver in (("leak-id-aaa", "1.0.0"), ("leak-id-bbb", "1.0.1"), ("leak-id-aaa", "1.0.0")):
+            code, _ = self._post_json("/api/errors", {"id": install, "v": ver, "os": "win32", "items": items},
+                                      headers=self._key_headers())
+            self.assertEqual(code, 200)
+        self._post_json("/api/errors", {"id": "leak-id-ccc", "v": "1.0.1", "os": "linux",
+                                        "items": [{"kind": "Err", "message": "другая"}]}, headers=self._key_headers())
+        code, body, _ = self._get("/api/review/errors?days=30", headers=self._admin())
+        self.assertEqual(code, 200)
+        self.assertNotIn("leak-id", body.decode())
+        res = json.loads(body)
+        self.assertGreaterEqual(res["total"], 4)
+        self.assertIn("1.0.1", res["byVersion"])
+        self.assertIn("linux", res["byOs"])
+        g = [x for x in res["groups"] if x["message"] == "boom"][0]
+        self.assertEqual((g["count"], g["installs"]), (3, 2))
+        self.assertEqual(g["versions"], ["1.0.0", "1.0.1"])
+        self.assertEqual(len(g["sample"]["stack"]), 4000)
+        self.assertNotIn("id", g["sample"])
+        self.assertEqual(res["groups"][0]["count"], max(x["count"] for x in res["groups"]))
+        # days ограничивается, мусор не роняет
+        self.assertEqual(json.loads(self._get("/api/review/errors?days=9999", headers=self._admin())[1])["days"], 90)
+        self.assertEqual(self._get("/api/review/errors?days=abc", headers=self._admin())[0], 200)
+
+    def test_review_feedback_list_screenshot_log_and_traversal(self):
+        png = b"\x89PNG\r\n\x1a\nSHOT"
+        payload = {"id": "fbleak-1234567", "v": "1.0.0", "os": "win32", "text": "привет", "contact": "a@b.c",
+                   "log": "строка лога", "screenshot": base64.b64encode(png).decode(), "screenshotType": "png"}
+        self.assertEqual(self._post_json("/api/feedback", payload, headers=self._key_headers())[0], 200)
+        code, body, _ = self._get("/api/review/feedback", headers=self._admin())
+        self.assertEqual(code, 200)
+        self.assertNotIn("fbleak", body.decode().replace(json.loads(body)["items"][0]["key"], ""))
+        item = [i for i in json.loads(body)["items"] if i["text"] == "привет"][0]
+        self.assertEqual((item["v"], item["os"], item["contact"]), ("1.0.0", "win32", "a@b.c"))
+        self.assertTrue(item["hasLog"] and item["hasScreenshot"])
+        self.assertNotIn("log", item)
+        code, data, hdr = self._get("/api/review/feedback/%s/screenshot" % item["key"], headers=self._admin())
+        self.assertEqual((code, data, hdr.get("Content-Type")), (200, png, "image/png"))
+        code, data, hdr = self._get("/api/review/feedback/%s/log" % item["key"], headers=self._admin())
+        self.assertEqual(code, 200)
+        self.assertEqual(data.decode("utf-8"), "строка лога")
+        self.assertTrue(hdr["Content-Type"].startswith("text/plain"))
+        self.assertEqual(self._get("/api/review/feedback/%s/screenshot" % item["key"])[0], 403)
+        for bad in ("..", "%2e%2e", "%2e%2e%2f%2e%2e", "a%2f..", ".hidden"):
+            code, _, _ = self._get("/api/review/feedback/%s/screenshot" % bad, headers=self._admin())
+            self.assertIn(code, (400, 404), bad)
+        self.assertEqual(self._get("/api/review/feedback/nonexistent-key/log", headers=self._admin())[0], 400)
+
     def test_ping_forbidden_without_key(self):
         code, _, _ = self._get("/api/ping?id=abc123&v=1.0.0")
         self.assertEqual(code, 403)

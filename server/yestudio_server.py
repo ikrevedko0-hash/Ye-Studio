@@ -18,6 +18,9 @@
   POST /api/review                              — порция ответов игрока
   GET  /api/review/export/<пак>                 — выгрузка для автора (заголовок X-Review-Admin)
   GET  /api/review/installs                     — сводка по установкам без id и ip (тот же заголовок X-Review-Admin)
+  GET  /api/review/errors?days=30               — ошибки приложения, сгруппированные, без id установок (X-Review-Admin)
+  GET  /api/review/feedback?days=90             — обращения игроков (X-Review-Admin)
+  GET  /api/review/feedback/<ключ>/screenshot|log — снимок / лог обращения (X-Review-Admin)
 
 Запуск:
   python3 yestudio_server.py
@@ -43,7 +46,7 @@ import tempfile
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
@@ -271,6 +274,139 @@ def installs_summary() -> dict:
         "firstByDay": dict(sorted(first_by_day.items())),
         "generatedAt": now_iso(),
     }
+
+
+def _days_param(qs: dict, default: int, maximum: int) -> int:
+    try:
+        days = int((qs.get("days") or [default])[0])
+    except (TypeError, ValueError):
+        days = default
+    return max(1, min(days, maximum))
+
+
+def errors_summary(days: int) -> dict:
+    """Ошибки приложения за days дней из errors/<ГГГГ-ММ>.jsonl, сгруппированные по (тип, первая строка сообщения).
+    Id установок наружу не идут — только число разных."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    months = []
+    y, m = cutoff.year, cutoff.month
+    while (y, m) <= (now.year, now.month):
+        months.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    total = 0
+    by_version: dict[str, int] = {}
+    by_os: dict[str, int] = {}
+    groups: dict[tuple, dict] = {}
+    for month in months:
+        path = os.path.join(DATA_DIR, "errors", f"{month}.jsonl")
+        try:
+            f = open(path, "r", encoding="utf-8")
+        except OSError:
+            continue
+        with f:
+            for line in f:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                when = _parse_iso(rec.get("received")) or _parse_iso(rec.get("ts"))
+                if not when or when < cutoff:
+                    continue
+                total += 1
+                v = str(rec.get("v") or "?")[:32]
+                o = str(rec.get("os") or "?")[:64]
+                by_version[v] = by_version.get(v, 0) + 1
+                by_os[o] = by_os.get(o, 0) + 1
+                kind = str(rec.get("kind") or "")[:128]
+                msg = str(rec.get("message") or "").strip().split("\n", 1)[0][:300]
+                g = groups.get((kind, msg))
+                if g is None:
+                    g = groups[(kind, msg)] = {"message": msg, "kind": kind, "count": 0, "ids": set(),
+                                               "versions": set(), "first": None, "last": None, "sample": None}
+                g["count"] += 1
+                g["ids"].add(str(rec.get("id") or ""))
+                g["versions"].add(v)
+                stamp = when.isoformat()
+                if g["first"] is None or stamp < g["first"]:
+                    g["first"] = stamp
+                if g["last"] is None or stamp >= g["last"]:
+                    g["last"] = stamp
+                    sample = {k: rec.get(k) for k in ("received", "v", "os", "ts", "where", "kind", "message", "stack", "count")}
+                    if isinstance(sample.get("stack"), str):
+                        sample["stack"] = sample["stack"][:4000]
+                    g["sample"] = sample
+    out = []
+    for g in sorted(groups.values(), key=lambda g: -g["count"])[:50]:
+        out.append({"message": g["message"], "kind": g["kind"], "count": g["count"], "installs": len(g["ids"]),
+                    "versions": sorted(g["versions"]), "first": g["first"], "last": g["last"], "sample": g["sample"]})
+    return {
+        "days": days,
+        "total": total,
+        "byVersion": dict(sorted(by_version.items(), key=lambda kv: -kv[1])),
+        "byOs": dict(sorted(by_os.items(), key=lambda kv: -kv[1])),
+        "groups": out,
+        "generatedAt": now_iso(),
+    }
+
+
+FEEDBACK_KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_FEEDBACK_SHOTS = (("screenshot.png", "image/png"), ("screenshot.jpg", "image/jpeg"))
+
+
+def _feedback_folder(key: str):
+    """Папка обращения по ключу или None. Ключ — только безопасные символы, папка обязана лежать внутри feedback/."""
+    if not FEEDBACK_KEY_RE.match(key or ""):
+        return None
+    root = os.path.realpath(os.path.join(DATA_DIR, "feedback"))
+    folder = os.path.realpath(os.path.join(root, key))
+    if os.path.dirname(folder) != root or not os.path.isdir(folder):
+        return None
+    return folder
+
+
+def _feedback_shot(folder: str):
+    for name, ctype in _FEEDBACK_SHOTS:
+        p = os.path.join(folder, name)
+        if os.path.isfile(p):
+            return p, ctype
+    return None
+
+
+def feedback_list(days: int) -> dict:
+    """Обращения игроков за days дней, новые сверху, до 100. Id установки наружу не идёт."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    root = os.path.join(DATA_DIR, "feedback")
+    try:
+        names = sorted(os.listdir(root), reverse=True)
+    except OSError:
+        names = []
+    items = []
+    for key in names:
+        if len(items) >= 100:
+            break
+        folder = _feedback_folder(key)
+        if not folder:
+            continue
+        meta = read_json_safe(os.path.join(folder, "feedback.json"), None)
+        if not isinstance(meta, dict):
+            continue
+        when = _parse_iso(meta.get("received"))
+        if when and when < cutoff:
+            continue
+        items.append({
+            "key": key,
+            "date": meta.get("received"),
+            "v": str(meta.get("v") or "")[:64],
+            "os": str(meta.get("os") or "")[:64],
+            "text": str(meta.get("text") or ""),
+            "contact": meta.get("contact") or None,
+            "hasLog": bool(meta.get("log")),
+            "hasScreenshot": _feedback_shot(folder) is not None,
+        })
+    return {"items": items}
 
 
 # ---------------------------------------------------------------------------
@@ -506,7 +642,7 @@ class Handler(BaseHTTPRequestHandler):
 
         ts = datetime.now(timezone.utc)
         stamp = ts.strftime("%Y%m%d-%H%M%S")
-        short_id = (install_id[:8] if install_id else "unknown")
+        short_id = re.sub(r"[^A-Za-z0-9._-]", "_", install_id[:8]) if install_id else "unknown"
         # Не даём пересечься параллельным отправкам с одинаковой секундой/id.
         folder_name = f"{stamp}-{short_id}-{uuid.uuid4().hex[:6]}"
         folder = os.path.join(DATA_DIR, "feedback", folder_name)
@@ -647,10 +783,37 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.OK, {"packs": store.packs()})
             return True
         if path == "/api/review/installs":
-            token = self.headers.get("X-Review-Admin") or ""
-            if not hmac.compare_digest(token.encode(), store.admin_token().encode()):
-                raise ApiError(HTTPStatus.FORBIDDEN, "forbidden")
+            self._require_review_admin(store)
             self._send_json(HTTPStatus.OK, installs_summary())
+            return True
+        if path == "/api/review/errors":
+            self._require_review_admin(store)
+            qs = parse_qs(urlsplit(self.path).query)
+            self._send_json(HTTPStatus.OK, errors_summary(_days_param(qs, 30, 90)))
+            return True
+        if path == "/api/review/feedback":
+            self._require_review_admin(store)
+            qs = parse_qs(urlsplit(self.path).query)
+            self._send_json(HTTPStatus.OK, feedback_list(_days_param(qs, 90, 365)))
+            return True
+        m = re.match(r"^/api/review/feedback/([^/]+)/(screenshot|log)$", path)
+        if m:
+            self._require_review_admin(store)
+            folder = _feedback_folder(m.group(1))
+            if not folder:
+                raise ApiError(HTTPStatus.BAD_REQUEST, "bad key")
+            if m.group(2) == "screenshot":
+                shot = _feedback_shot(folder)
+                if not shot:
+                    raise ApiError(HTTPStatus.NOT_FOUND, "no screenshot")
+                with open(shot[0], "rb") as f:
+                    self._send_bytes(f.read(), shot[1])
+            else:
+                meta = read_json_safe(os.path.join(folder, "feedback.json"), None)
+                log_text = meta.get("log") if isinstance(meta, dict) else None
+                if not log_text:
+                    raise ApiError(HTTPStatus.NOT_FOUND, "no log")
+                self._send_text(HTTPStatus.OK, str(log_text))
             return True
         m = re.match(r"^/api/review/(pack|board|export)/([^/]+)$", path)
         if not m:
@@ -669,6 +832,11 @@ class Handler(BaseHTTPRequestHandler):
                 raise ApiError(HTTPStatus.FORBIDDEN, "forbidden")
             self._send_json(HTTPStatus.OK, store.export(slug))
         return True
+
+    def _require_review_admin(self, store) -> None:
+        token = self.headers.get("X-Review-Admin") or ""
+        if not hmac.compare_digest(token.encode(), store.admin_token().encode()):
+            raise ApiError(HTTPStatus.FORBIDDEN, "forbidden")
 
     STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                     ".css": "text/css; charset=utf-8", ".webp": "image/webp", ".png": "image/png",
