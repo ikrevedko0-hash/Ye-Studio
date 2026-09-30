@@ -140,6 +140,15 @@ const TIP = `<svg class="tip" viewBox="0 0 400 90" preserveAspectRatio="none" ar
     </svg>`;
 
 // ---------- главная ----------
+// «Цитаты из прессы», как на обложке книги: n случайных разных из слота blurb («цитата | источник»).
+function blurbs(n) {
+  const list = (JK.blurb || []).slice();
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  const items = list.slice(0, n).map(v => { const [q, src] = split2(v.t);
+    return `<figure class="blurb"><blockquote>${esc(q)}</blockquote>${src ? `<figcaption>— ${esc(src)}</figcaption>` : ""}</figure>`; });
+  return items.length ? `<div class="blurbs">${items.join("")}</div>` : "";
+}
+
 async function home() {
   document.title = "Айсберг Уе!паков";
   const app = $("#app");
@@ -147,6 +156,7 @@ async function home() {
     <div class="sky-top"><div class="sun"></div></div>
     <h1>Айсберг Уе!паков</h1>
     <p class="sub">${esc(joke("home_sub"))}</p>
+    ${blurbs(2)}
     <p class="hint">Отвечай на что хочешь: до дна нырять не обязательно, каждый ответ сохраняется сразу.</p>
     ${TIP}</div>
     <div class="packs" id="packs"><div class="pk">Грузим паки…</div></div></div>`;
