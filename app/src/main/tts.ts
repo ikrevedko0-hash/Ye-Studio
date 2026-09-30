@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, win32 } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, win32 } from "node:path";
 import { chat, type ChatResult } from "../core/ai/chat";
 import { findAiConfig, type AiConfig, type AiProvider } from "../core/ai/config";
 import { ensureLocalServer, stopLocalServer } from "../core/ai/localServer";
@@ -168,8 +168,13 @@ export async function speak(baseDir: string, req: SpeakRequest, signal?: AbortSi
     ?? p.piperVoices.find((v) => v.lang === req.lang);
   if (!voice) throw new Error(`Нет голоса Piper для языка «${targetLangTitle(req.lang)}» — поставьте нужный в «Компонентах»`);
   const speed = req.speed && req.speed > 0 ? req.speed : 1;
-  const args = ["-m", voice.onnx, "-f", out, "--length_scale", String(Math.round((1 / speed) * 100) / 100)];
-  const r = await runProc(p.piper, args, { cwd: dirname(p.piper), stdin: text, signal, timeoutMs: SPEAK_TIMEOUT_MS });
+  // Piper читает пути в ANSI: на «Мастерская паков» падает с кодом 0xC0000409 («Illegal byte sequence»).
+  // Поэтому модель и espeak-ng-data — относительными путями от его папки (cwd); выходной файл кириллицу переносит.
+  const piperDir = dirname(p.piper);
+  const rel = relative(piperDir, voice.onnx);
+  const model = rel && !isAbsolute(rel) ? rel : voice.onnx;
+  const args = ["-m", model, "--espeak_data", "espeak-ng-data", "-f", out, "--length_scale", String(Math.round((1 / speed) * 100) / 100)];
+  const r = await runProc(p.piper, args, { cwd: piperDir, stdin: text, signal, timeoutMs: SPEAK_TIMEOUT_MS });
   if (r.code !== 0 || !existsSync(out)) throw new Error(`Piper не справился: ${r.err.trim().split("\n").pop() || `код ${r.code}`}`);
   return out;
 }

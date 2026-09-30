@@ -1396,7 +1396,8 @@ function registerIpc() {
       const mp3 = full.replace(/\.wav$/i, ".mp3");
       try {
         const sec = (await probe(full)).durationSec;
-        await transcode({ input: full, output: mp3, start: 0, end: Math.max(0.1, sec), audio: "only", quality: "normal" });
+        // голос из TTS тихий (замер 30.09: в среднем −36 дБ) — к общей громкости пака, как галочка в редакторе медиа
+        await transcode({ input: full, output: mp3, start: 0, end: Math.max(0.1, sec), audio: "only", quality: "normal", normalize: true });
         forPack = mp3;
       } catch { /* не вышло — в пак пойдёт wav */ }
     }
@@ -2725,7 +2726,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       open?.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
@@ -2907,7 +2908,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
       open.click();
       let params = null;
@@ -3105,9 +3106,12 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         if (!ins) return { ok: false, why: "нет кнопки «В вопрос» (не выбран вопрос?)" };
         if (ins.disabled) return { ok: false, why: "кнопка «В вопрос» выключена" };
         ins.click();
-        await wait(800);
+        // сохранение — копия в библиотеку и mp3 через ffmpeg: ждём ответа окна, а не фиксированную паузу
+        let note = "";
+        for (let i = 0; i < 600; i++) { await wait(100); note = document.querySelector(".mc-note")?.textContent ?? ""; if (/в вопросе|bad/.test(note) || document.querySelector(".mc-note.bad")) break; }
+        await wait(300);
         const qs = (window.__pack?.rounds ?? []).flatMap((r) => r.themes ?? []).flatMap((t) => t.questions ?? []);
-        const hit = qs.find((q) => (q.params ?? []).some((p) => p.children?.some((c) => c.item?.type === "audio" && /озвучка/.test(c.item.value))));
+        const hit = qs.find((q) => (q.params ?? []).some((p) => p.children?.some((c) => c.item?.type === "audio" && /озвучка/i.test(decodeURIComponent(c.item.value)))));
         if (!hit) return { ok: false, why: "озвучка не легла ни в один вопрос", note: document.querySelector(".mc-note")?.textContent };
         return { ok: true, вопрос: hit.params.map((p) => p.name + ": " + p.children.map((c) => (c.item?.type ?? "text") + "=" + c.item?.value).join(" | ")), ответ: hit.right };
       `)) };
