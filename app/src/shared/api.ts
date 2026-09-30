@@ -105,6 +105,8 @@ export interface PackDTO {
   path?: string;
   pkg: Package;
   media: MediaInfo[];
+  /** В архиве есть quality.marker — SIGame показывает пак как прошедший контроль качества. */
+  quality?: boolean;
   /** Только для самопроверки: открыть редактор медиа сразу после загрузки. */
   openEditorMedia?: MediaInfo;
   /** Только для самопроверки: открыть сборку коллажа сразу после загрузки. */
@@ -252,6 +254,8 @@ export interface Api {
   pasteTheme(): Promise<{ theme: Theme; media: MediaInfo[]; renamed: string[] } | null>;
   addMedia(paths?: string[]): Promise<MediaInfo[]>;
   removeMedia(folder: string, name: string): Promise<boolean>;
+  /** Галочка «контроль качества» SIGame (quality.marker в архиве). */
+  setQuality(on: boolean): Promise<boolean>;
   reveal(path: string): Promise<void>;
   /** Текст из буфера обмена (для «📋 Из Claude»). */
   clipboardText(): Promise<string>;

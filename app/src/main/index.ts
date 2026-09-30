@@ -20,6 +20,8 @@ import { prepareQuietSelfTest, SELF_TEST, showQuietly } from "./quietWindow";
 import { enableEditMenu } from "./editMenu";
 import { upscaleImage, upscalerReady } from "./upscale";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
+import { packDate, QUALITY_MARKER } from "../core/siq/quality";
+import { setPackAttr } from "../core/siq/board";
 import { findSigame, launchSigame } from "./sigame";
 import { cancelSigameRun, exportSigameRun, runFile, runSigameInApp, sigameInstalled } from "./sigameRun";
 import { cleanupCode, initUpdater } from "./updater";
@@ -80,11 +82,13 @@ interface Doc {
   path?: string;
   reader?: ZipReader;
   media: Map<string, MediaEntry>;
-  /** Прочие файлы в корне архива (quality.marker и т.п.) — переносим как есть */
+  /** Прочие файлы в корне архива — переносим как есть */
   extras: string[];
+  /** Галочка «контроль качества» SIGame: при записи кладём пустой quality.marker */
+  quality: boolean;
 }
 
-let doc: Doc = { media: new Map(), extras: [] };
+let doc: Doc = { media: new Map(), extras: [], quality: false };
 let win: BrowserWindow | null = null;
 /** Идущая сейчас обработка медиа — чтобы её можно было отменить. */
 let currentJob: AbortController | null = null;
@@ -413,12 +417,12 @@ function mediaInfo(m: MediaEntry): MediaInfo {
 }
 
 function dto(pkg: Package): PackDTO {
-  return { path: doc.path, pkg, media: [...doc.media.values()].map(mediaInfo) };
+  return { path: doc.path, pkg, media: [...doc.media.values()].map(mediaInfo), quality: doc.quality };
 }
 
 function closeDoc() {
   doc.reader?.close();
-  doc = { media: new Map(), extras: [] };
+  doc = { media: new Map(), extras: [], quality: false };
 }
 
 /** Отпечаток файла «crc32:размер» — как в оглавлении zip; по нему база повторов находит тот же файл в чужом паке. */
@@ -449,6 +453,10 @@ async function openPack(path: string): Promise<PackDTO> {
   for (const e of opened.reader.entries) {
     if (e.name === "content.xml") continue;
     const slash = e.name.indexOf("/");
+    if (e.name === QUALITY_MARKER) {
+      doc.quality = true;
+      continue;
+    }
     if (slash < 0) {
       doc.extras.push(e.name);
       continue;
@@ -573,6 +581,8 @@ async function savePack(pkg: Package, saveAs: boolean, forcedTarget?: string): P
 
   // вопросы с вариантами и картинкой: текст — репликой ведущего, иначе SIOnline отдаст кнопкам две трети экрана
   optionsTextToReplic(pkg);
+  // дата в карточке пака SIGame — день последнего сохранения
+  setPackAttr(pkg, "date", packDate());
   const tmp = `${target}.tmp-${Date.now()}`;
   await writeSiq(tmp, pkg, docEntries());
   if (doc.reader && doc.path?.toLowerCase() === target.toLowerCase()) doc.reader.close();
@@ -590,6 +600,8 @@ async function savePack(pkg: Package, saveAs: boolean, forcedTarget?: string): P
 /** Все файлы открытого пака для записи архива: медиа и прочие записи корня. */
 function docEntries(): EntryToWrite[] {
   return [
+    // маркер качества — сразу за content.xml, как у SIQuester
+    ...(doc.quality ? [{ name: QUALITY_MARKER, source: { kind: "buffer" as const, data: Buffer.alloc(0) } }] : []),
     ...[...doc.media.values()].map((m) => ({ name: `${m.folder}/${escapeName(m.name)}`, source: m.source })),
     ...(doc.reader ? doc.extras.map((name) => ({ name, source: { kind: "zip" as const, reader: doc.reader!, name } })) : []),
   ];
@@ -857,6 +869,7 @@ function registerIpc() {
     return addMediaFiles(paths);
   });
 
+  ipcMain.handle("pack:setQuality", (_e, on: boolean) => (doc.quality = !!on));
   ipcMain.handle("media:remove", (_e, folder: string, name: string) => doc.media.delete(key(folder, name)));
 
   /** Байты файла из пака: fetch к siq:// из окна не проходит, а canvas нужен «чистый» источник. */

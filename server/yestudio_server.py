@@ -782,6 +782,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/review/packs":
             self._send_json(HTTPStatus.OK, {"packs": store.packs()})
             return True
+        if path == "/api/review/quotes":
+            self._send_json(HTTPStatus.OK, {"quotes": store.quotes()})
+            return True
         if path == "/api/review/installs":
             self._require_review_admin(store)
             self._send_json(HTTPStatus.OK, installs_summary())
