@@ -28,6 +28,7 @@ const api: Api = {
   pasteTheme: () => ipcRenderer.invoke("theme:paste"),
   addMedia: (paths) => ipcRenderer.invoke("media:add", paths),
   removeMedia: (folder, name) => ipcRenderer.invoke("media:remove", folder, name),
+  setQuality: (on) => ipcRenderer.invoke("pack:setQuality", on),
   reveal: (path) => ipcRenderer.invoke("shell:reveal", path),
   clipboardText: () => ipcRenderer.invoke("clipboard:text"),
   clipboardWrite: (text) => ipcRenderer.invoke("clipboard:write", text),

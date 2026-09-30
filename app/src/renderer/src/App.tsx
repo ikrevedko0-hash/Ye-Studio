@@ -251,6 +251,12 @@ export function App() {
     };
   }, []);
 
+  const setQuality = useCallback(async (on: boolean) => {
+    await window.api.setQuality(on);
+    setPack((prev) => (prev ? { ...prev, quality: on } : prev));
+    setDirty(true);
+  }, []);
+
   const addMedia = useCallback(async (paths?: string[]): Promise<MediaInfo[]> => {
     const added = await window.api.addMedia(paths);
     if (added.length) {
@@ -657,7 +663,7 @@ export function App() {
           }}
         />
       )}
-      {packProps && <PackProps pack={pack} mutate={mutate} addMedia={addMedia} onClose={() => setPackProps(false)} />}
+      {packProps && <PackProps pack={pack} mutate={mutate} addMedia={addMedia} setQuality={setQuality} onClose={() => setPackProps(false)} />}
       {publish && <Publish pack={pack} onClose={() => setPublish(false)} />}
       {transfer && pack.pkg.rounds?.[transfer.round]?.themes?.[transfer.theme] && (
         <ThemeTransfer

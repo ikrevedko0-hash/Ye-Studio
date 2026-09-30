@@ -2,6 +2,7 @@ import { useState } from "react";
 import { packLogo, setPackAttr, setPackLogo } from "../../core/siq/board";
 import { clearAllComments, countComments } from "../../core/siq/helpers";
 import { getAttr } from "../../core/siq/model";
+import { qualityProblems } from "../../core/siq/quality";
 import type { MediaInfo, PackDTO } from "../../shared/api";
 import type { Mutate } from "./App";
 import { LogoNumber } from "./LogoNumber";
@@ -10,13 +11,14 @@ interface Props {
   pack: PackDTO;
   mutate: Mutate;
   addMedia(paths?: string[]): Promise<MediaInfo[]>;
+  setQuality(on: boolean): void;
   onClose(): void;
 }
 
 const splitList = (v: string) => v.split(",").map((s) => s.trim()).filter(Boolean);
 
 /** Свойства пака — то, что SIGame показывает на карточке пака: логотип, авторы, сложность, возраст… */
-export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
+export function PackProps({ pack, mutate, addMedia, setQuality, onClose }: Props) {
   const pkg = pack.pkg;
   const attr = (k: string) => getAttr(pkg, k) ?? "";
   const set = (k: string) => (v: string) => mutate((p) => setPackAttr(p, k, v));
@@ -25,6 +27,7 @@ export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
   const logoMedia = logo ? images.find((m) => m.name === logo) : undefined;
   const [note, setNote] = useState("");
   const [numbering, setNumbering] = useState(false);
+  const problems = pack.quality ? qualityProblems(pack.media) : [];
 
   // списки правим строкой: «Иванов, Петров» — иначе запятая посреди ввода съедалась бы
   const [authors, setAuthors] = useState((pkg.info?.authors ?? []).filter(Boolean).join(", "));
@@ -117,7 +120,7 @@ export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
             <input value={attr("contactUri")} onChange={(e) => set("contactUri")(e.target.value)} placeholder="https://vk.com/…" />
           </label>
           <label>
-            Дата
+            Дата (ставится сама при сохранении)
             <input value={attr("date")} onChange={(e) => set("date")(e.target.value)} placeholder="дд.мм.гггг" />
           </label>
           <label>
@@ -150,6 +153,18 @@ export function PackProps({ pack, mutate, addMedia, onClose }: Props) {
             Комментарий к паку
             <textarea rows={3} value={pkg.info?.comments ?? ""} onChange={(e) => setComments(e.target.value)} />
           </label>
+          <div className="wide">
+            <label className="check">
+              <input type="checkbox" checked={!!pack.quality} onChange={(e) => setQuality(e.target.checked)} />
+              Автопроверка качества — SIGame покажет пак как прошедший контроль качества
+            </label>
+            {problems.length > 0 && (
+              <p className="muted">
+                Не проходят лимиты SIGame (картинки до 1 МБ, звук до 5 МБ mp3/opus, видео до 10 МБ mp4) — {problems.length} шт.:{" "}
+                {problems.slice(0, 5).map((p) => `${p.name} (${p.why})`).join(", ")}{problems.length > 5 ? "…" : ""}
+              </p>
+            )}
+          </div>
           <div className="wide">
             <button onClick={clearComments} disabled={!commentsCount}
               title={commentsCount ? undefined : "В паке нет комментариев"}>
