@@ -53,15 +53,22 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
   useEffect(() => { void window.api.upscaleReady().then(setUpReady).catch(() => setUpReady(false)); }, []);
 
   // сначала предпросмотр и сравнение с оригиналом; в пак — только по «Сохранить в пак»
-  const [upPreview, setUpPreview] = useState<{ token: string; url: string; size: number; factor: 2 | 4 } | null>(null);
+  // before — свой адрес оригинала: у img.src он временный (loadPackImage отзывает его через 10 с),
+  // а увеличение идёт дольше, и в сравнении слева было пусто
+  const [upPreview, setUpPreview] = useState<{ token: string; url: string; size: number; factor: 2 | 4; before: string } | null>(null);
+  useEffect(() => () => { if (upPreview) URL.revokeObjectURL(upPreview.before); }, [upPreview]);
   const ipcText = (e: unknown) => (e as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
   const upscale = async (factor: 2 | 4) => {
     if (!img) return;
     if (upReady === false) { setError("ИИ-увеличение не установлено: «Настройки» → «Компоненты» → «ИИ-увеличение» → «Установить» (~95 МБ)."); return; }
     setBusy(true); setUpscaling(true); setError("");
     try {
-      const p = await window.api.upscaleImage(media.folder, media.name, img.naturalWidth, img.naturalHeight, factor);
-      setUpPreview({ ...p, factor });
+      const [p, orig] = await Promise.all([
+        window.api.upscaleImage(media.folder, media.name, img.naturalWidth, img.naturalHeight, factor),
+        window.api.mediaBytes(media.folder, media.name),
+      ]);
+      const before = URL.createObjectURL(new Blob([new Uint8Array(orig.data)], { type: orig.type }));
+      setUpPreview({ ...p, factor, before });
     } catch (e) {
       setError(ipcText(e));
     } finally {
@@ -464,7 +471,7 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
         </div>
       </div>
       {upPreview && img && (
-        <UpscaleCompare before={img.src} after={upPreview.url} afterBytes={upPreview.size} factor={upPreview.factor}
+        <UpscaleCompare before={upPreview.before} after={upPreview.url} afterBytes={upPreview.size} factor={upPreview.factor}
                         busy={busy} onKeep={() => void keepUpscaled()} onDrop={dropUpscaled} />
       )}
     </div>
