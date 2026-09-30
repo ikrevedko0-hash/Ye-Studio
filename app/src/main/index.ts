@@ -1662,6 +1662,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --word-studio=<кусок> [--word-create=1]
  *                                     открыть студию слов, подобрать матрицу, при --word-create=1 создать тему;
  *                                     --word-gen=Инициалы --word-args=letter=Х,count=3 — другой генератор и его списки;
+ *   --voice-studio=<фраза> [--voice-target=la] [--voice-speak=1] [--voice-insert=1] [--voice-shot=<png>]
+ *                                     Студия → «Голос»: перевести по-настоящему, озвучить, вставить в выбранный вопрос;
  *   --ai-settings=1 [--ai-select=<сервис>] [--ai-tab=queues]
  *                                     открыть настройки ИИ из шапки, дождаться остатков (для снимка);
  *   --imagegen-test=<фраза> [--imagegen-preset=<название>] [--imagegen-again=1]
@@ -1727,7 +1729,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -3043,6 +3045,77 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     if (!result?.ok) process.exitCode = 1;
   }
 
+  // Студия → «Голос»: фраза → перевод (облако/локально) → при --voice-speak=1 озвучка → при --voice-insert=1 в вопрос.
+  const vsPhrase = arg("voice-studio");
+  if (data && vsPhrase) {
+    const vsShot = arg("voice-shot");
+    const shotAs = async (name: string) => { if (vsShot) await writeFile(vsShot.replace(/\.png$/i, `-${name}.png`), (await win.webContents.capturePage()).toPNG()); };
+    const step = (code: string) => win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      ${code}
+    })()`);
+    let result = await step(`
+      let open = null;
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
+      open.click();
+      let tab = null;
+      for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Голос"); }
+      if (!tab) return { ok: false, why: "нет вкладки «Голос»" };
+      tab.click();
+      await wait(300);
+      const target = ${JSON.stringify(arg("voice-target") ?? "")};
+      if (target) { byText(".ws-side .ws-gen", target)?.click(); await wait(100); }
+      const field = document.querySelector(".ig-phrase input");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(field, ${JSON.stringify(vsPhrase)});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await wait(80);
+      const t0 = performance.now();
+      byText(".ws-params button", "Перевести")?.click();
+      let vars = [];
+      for (let i = 0; i < 1200; i++) {
+        await wait(100);
+        vars = [...document.querySelectorAll(".vs-variant")].map((b) => b.textContent);
+        if (vars.length || document.querySelector(".mc-note.bad") || document.querySelector(".ig-prompt textarea")?.value) break;
+      }
+      return {
+        ok: !document.querySelector(".mc-note.bad") && !!document.querySelector(".ig-prompt textarea")?.value,
+        перевод: vars, чем: document.querySelector(".vs-variants > .muted")?.textContent, сек: Math.round(performance.now() - t0) / 1000,
+        ошибка: document.querySelector(".mc-note.bad")?.textContent, голос: document.querySelector(".ws-params select")?.selectedOptions?.[0]?.textContent,
+      };
+    `);
+    await shotAs("перевод");
+    if (result?.ok && arg("voice-speak") === "1") {
+      result = { ...result, ...(await step(`
+        const t0 = performance.now();
+        byText(".ws-params button", "Озвучить")?.click();
+        let a = null;
+        for (let i = 0; i < 1900 && !a; i++) { await wait(100); a = document.querySelector(".vs-player audio"); if (document.querySelector(".mc-note.bad")) break; }
+        if (!a) return { ok: false, why: document.querySelector(".mc-note.bad")?.textContent ?? "озвучка не пришла" };
+        for (let i = 0; i < 50 && !(a.duration > 0); i++) await wait(100);
+        return { ok: a.duration > 0, озвучкаСек: Math.round(performance.now() - t0) / 1000, длина: a.duration };
+      `)) };
+      await shotAs("озвучка");
+    }
+    if (result?.ok && arg("voice-insert") === "1") {
+      result = { ...result, ...(await step(`
+        const ins = byText(".ig-actions button", "В вопрос");
+        if (!ins) return { ok: false, why: "нет кнопки «В вопрос» (не выбран вопрос?)" };
+        if (ins.disabled) return { ok: false, why: "кнопка «В вопрос» выключена" };
+        ins.click();
+        await wait(800);
+        const qs = (window.__pack?.rounds ?? []).flatMap((r) => r.themes ?? []).flatMap((t) => t.questions ?? []);
+        const hit = qs.find((q) => (q.params ?? []).some((p) => p.children?.some((c) => c.item?.type === "audio" && /озвучка/.test(c.item.value))));
+        if (!hit) return { ok: false, why: "озвучка не легла ни в один вопрос", note: document.querySelector(".mc-note")?.textContent };
+        return { ok: true, вопрос: hit.params.map((p) => p.name + ": " + p.children.map((c) => (c.item?.type ?? "text") + "=" + c.item?.value).join(" | ")), ответ: hit.right };
+      `)) };
+    }
+    console.log("САМОПРОВЕРКА «Голос»:", JSON.stringify(result, null, 1));
+    if (!result?.ok) process.exitCode = 1;
+  }
+
   // Свои пресеты картинок: «Свой промпт» → пресет-шаблон → подстановка фразы → инструкция → удаление.
   // Пресеты пишутся в baseDir(): запускать с PORTABLE_EXECUTABLE_DIR на временную папку, чтобы не трогать настоящие.
   const presetShot = arg("preset-test");
@@ -3207,8 +3280,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
-      if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
       open.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
@@ -3648,7 +3721,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;

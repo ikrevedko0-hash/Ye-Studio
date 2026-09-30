@@ -73,8 +73,8 @@ export function MediaStrip({ actions }: { actions: Pick<Actions, "proposals" | "
         <Icon name="globe" />Найти в сети
       </button>
       <button className="k-media" onClick={actions.library} title="Всё, что уже скачано для этого пака: оригиналы в source/"><Icon name="library" />Скачанное</button>
-      <button className="k-words tb-studio" onClick={actions.wordStudio} title="Слова и картинки: темы на словах (матрицы, анаграммы) и ИИ-картинки для тем">
-        <Icon name="palette" />Слова и картинки
+      <button className="k-words tb-studio" onClick={actions.wordStudio} title="Студия: темы на словах (матрицы, анаграммы), ИИ-картинки и голос — перевод фразы (латынь и др.) с озвучкой">
+        <Icon name="palette" />Слова, картинки, голос
       </button>
     </div>
   );

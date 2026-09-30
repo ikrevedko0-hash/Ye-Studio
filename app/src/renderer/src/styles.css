@@ -607,6 +607,18 @@ button.link.inline { padding: 0; }
 .ig-stage { flex: 1; min-height: 240px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
 .ig-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .ig-actions { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+/* Студия → «Голос» */
+.word-studio button:disabled { opacity: .45; cursor: default; }
+.vs-main { display: flex; flex-direction: column; gap: 10px; }
+.vs-check { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; margin: 0; }
+.vs-check input { width: auto; margin: 0; flex: none; }
+.vs-variants { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.vs-variant { text-align: left; font-size: 14px; padding: 6px 10px; white-space: normal; }
+.vs-variant.sel { border-color: var(--gold); color: var(--gold); }
+.vs-player { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.vs-player audio { height: 36px; }
+.vs-place { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.vs-main .mc-errors { display: flex; align-items: center; gap: 10px; }
 .ig-work { flex: 1; min-height: 360px; display: flex; gap: 10px; }
 .ig-work .ig-stage { min-width: 0; }
 .ig-work .pp { flex: 0 0 420px; min-height: 0; overflow: hidden; }

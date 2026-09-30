@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import type { GeneratorArgs, GeneratorInfo, MediaInfo, PuzzleTheme, WordHit } from "../../shared/api";
 import { ImageStudio } from "./ImageStudio";
+import { VoiceStudio } from "./VoiceStudio";
+import type { PlacementOptions } from "../../core/tts/placement";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -25,6 +27,10 @@ interface Props {
   onImageAdded(img: MediaInfo): void;
   /** Открыть настройки ИИ поверх студии. */
   onOpenAi?(): void;
+  /** Озвучка и перевод — в открытый вопрос по галочкам. */
+  onInsertVoice?(media: MediaInfo | undefined, opts: PlacementOptions, data: { translated: string; original: string }): void;
+  /** Открыть «Компоненты» (поставить голоса). */
+  onOpenComponents?(): void;
 }
 
 /** Значения по умолчанию из описания генератора. */
@@ -34,9 +40,9 @@ function defaults(g: GeneratorInfo): GeneratorArgs {
   return a;
 }
 
-export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, themeSize, onInsertImage, onImageAdded, onOpenAi }: Props) {
+export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, themeSize, onInsertImage, onImageAdded, onOpenAi, onInsertVoice, onOpenComponents }: Props) {
   // Вкладку не запоминаем нарочно: самопроверка --word-studio ждёт, что окно откроется на словах.
-  const [tab, setTab] = useState<"words" | "images">("words");
+  const [tab, setTab] = useState<"words" | "images" | "voice">("words");
   const [gens, setGens] = useState<GeneratorInfo[]>([]);
   const [current, setCurrent] = useState<GeneratorInfo | null>(null);
   const [args, setArgs] = useState<GeneratorArgs>({});
@@ -103,6 +109,7 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
           <span className="ws-tabs">
             <button className={tab === "words" ? "sel" : ""} onClick={() => setTab("words")}><Icon name="text" />Слова</button>
             <button className={tab === "images" ? "sel" : ""} onClick={() => setTab("images")}><Icon name="palette" />Картинки</button>
+            <button className={tab === "voice" ? "sel" : ""} onClick={() => setTab("voice")}><Icon name="audio" />Голос</button>
           </span>
           {tab === "words" && (
             <span className="muted">
@@ -113,7 +120,9 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
           <button onClick={onClose} disabled={busy}>Закрыть</button>
         </header>
 
-        {tab === "images" ? (
+        {tab === "voice" ? (
+          <VoiceStudio onInsert={onInsertVoice} insertTarget={insertTarget} onAdded={onImageAdded} onOpenAi={onOpenAi} onOpenComponents={onOpenComponents} />
+        ) : tab === "images" ? (
           <ImageStudio onInsert={onInsertImage} insertTarget={insertTarget} onAdded={onImageAdded} onOpenAi={onOpenAi} />
         ) : (<>
         {noDict && (

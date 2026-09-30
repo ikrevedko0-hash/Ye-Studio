@@ -4,6 +4,7 @@ import { History } from "../../core/history";
 import { flushSync } from "react-dom";
 import { appendTheme, isSortedByPrice, moveQuestion, moveQuestionTo, moveTheme, reorderTheme, sortThemeByPrice, type Relocate, type Slot } from "../../core/siq/board";
 import { appendMedia, applyTimeDefaults, packStats, paramItems } from "../../core/siq/helpers";
+import { applyRight, applyToItems, planPlacement, type PlacementOptions } from "../../core/tts/placement";
 import type { Package, Round } from "../../core/siq/model";
 import type { DraftInfo, MediaInfo, PackDTO, ThemeClipInfo, WordHit } from "../../shared/api";
 import { Board } from "./Board";
@@ -373,6 +374,37 @@ export function App() {
     );
   }, [mutate, sel, pack, imageAdded]);
 
+  /** Студия → «Голос»: озвучка и тексты по галочкам (core/tts/placement.ts); выбор — к следующему вопросу темы. */
+  const insertVoice = useCallback((media: MediaInfo | undefined, opts: PlacementOptions, data: { translated: string; original: string }) => {
+    if (!sel) return;
+    if (media) imageAdded(media);
+    const plan = planPlacement(opts, { ...data, audioName: media?.name });
+    const inTheme = pack?.pkg.rounds?.[sel.round]?.themes?.[sel.theme]?.questions?.length ?? 0;
+    const moved = sel.question + 1 < inTheme;
+    mutate((p) => {
+      const q = p.rounds?.[sel.round]?.themes?.[sel.theme]?.questions?.[sel.question];
+      if (!q) return;
+      q.params ??= [];
+      for (const [name, added] of [["question", plan.question], ["answer", plan.answer]] as const) {
+        if (!added.length) continue;
+        let param = q.params.find((x) => x.name === name);
+        if (!param) {
+          param = { name, type: "content", children: [] };
+          q.params.push(param);
+        }
+        // пустую текстовую заготовку убираем, чтобы в вопросе не висел пустой экран
+        const items = paramItems(param).filter((it) => it.type || it.value.trim());
+        param.children = [...applyToItems(items, added).map((it) => ({ kind: "item" as const, item: it })), ...param.children.filter((c) => c.kind !== "item")];
+      }
+      q.right = applyRight(q.right ?? [], plan.right);
+    });
+    if (moved) setSel({ ...sel, question: sel.question + 1 });
+    setStatus(
+      `Озвучка «${data.translated}»` + (plan.right ? ` → ответ «${plan.right}»` : "")
+      + (moved ? ". Перешёл к следующему вопросу темы" : ". Это был последний вопрос темы — дальше выберите вопрос сами"),
+    );
+  }, [mutate, sel, pack, imageAdded]);
+
   // перетаскивание границы между табло и редактором вопроса
   useEffect(() => {
     if (!dragging) return;
@@ -617,6 +649,8 @@ export function App() {
           onInsertImage={sel ? insertImage : undefined}
           onImageAdded={imageAdded}
           onOpenAi={() => setAiSettings(true)}
+          onInsertVoice={sel ? insertVoice : undefined}
+          onOpenComponents={() => setComponents(true)}
           themeSize={rounds[round]?.themes?.[0]?.questions?.length || undefined}
           insertTarget={sel ? `${rounds[sel.round]?.themes?.[sel.theme]?.name ?? ""} · ${rounds[sel.round]?.themes?.[sel.theme]?.questions?.[sel.question]?.price ?? ""}` : undefined}
         />
