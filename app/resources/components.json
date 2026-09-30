@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Что ставит окно «Компоненты». Версии закреплены, суммы — из API GitHub и Hugging Face (2026-09-25). Пути моделей — от папки модели (components\\model), пути tools — от папки компонентов. Менять вместе с tests/components.test.ts.",
+  "note": "Что ставит окно «Компоненты». Версии закреплены, суммы — из API GitHub и Hugging Face (2026-09-25; llama.cpp, Qwen3-TTS, Piper и голоса — 2026-09-30). Пути моделей — от папки модели (components\\model), пути tools — от папки компонентов. Менять вместе с tests/components.test.ts.",
   "files": {
     "sd-cuda12": {
       "title": "sd.cpp (CUDA 12)",
@@ -96,6 +96,155 @@
         "ffmpeg.exe",
         "ffprobe.exe"
       ]
+    },
+    "llama-cuda12": {
+      "title": "llama.cpp b11269 (CUDA 12)",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11269/llama-b11269-bin-win-cuda-12.4-x64.zip",
+      "size": 264528976,
+      "sha256": "0a64400c169e009235a0c5eafb05c198032b5dda5878b51efaf23d97986858a1",
+      "unzipTo": "llama"
+    },
+    "llama-cudart12": {
+      "title": "Библиотеки CUDA 12 для llama.cpp",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11269/cudart-llama-bin-win-cuda-12.4-x64.zip",
+      "size": 391443627,
+      "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6",
+      "unzipTo": "llama"
+    },
+    "llama-vulkan-zip": {
+      "title": "llama.cpp b11269 (Vulkan)",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11269/llama-b11269-bin-win-vulkan-x64.zip",
+      "size": 33093265,
+      "sha256": "34a27c239727047adc5aed80b656b13373ff136b27d28bd898a14b7b7283695a",
+      "unzipTo": "llama-vulkan"
+    },
+    "qwen3-tts-q4": {
+      "title": "Qwen3-TTS 1.7B (голос, Q4_K_M)",
+      "url": "https://huggingface.co/ggml-org/Qwen3-TTS-12Hz-1.7B-Base-GGUF/resolve/main/Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf",
+      "size": 1035965280,
+      "sha256": "8d18c94acb2addd042f97da63c98be144eafa76d0d9495177eab65130cf85129",
+      "path": "tts-model/Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf"
+    },
+    "qwen3-tts-mmproj": {
+      "title": "Qwen3-TTS 1.7B (кодек, Q8_0)",
+      "url": "https://huggingface.co/ggml-org/Qwen3-TTS-12Hz-1.7B-Base-GGUF/resolve/main/mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf",
+      "size": 446422912,
+      "sha256": "6fd65188839bcd6ecc91b277ad471e22a0edfada4699a0fe82f1165c18cfcce2",
+      "path": "tts-model/mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf"
+    },
+    "qwen3-4b-llm": {
+      "title": "Qwen3 4B (переводчик, Q4_K_M)",
+      "url": "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+      "size": 2497281312,
+      "sha256": "f6f851777709861056efcdad3af01da38b31223a3ba26e61a4f8bf3a2195813a",
+      "path": "llm-model/Qwen3-4B-Q4_K_M.gguf"
+    },
+    "piper-zip": {
+      "title": "Piper 2023.11.14-2",
+      "url": "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip",
+      "size": 22477236,
+      "sha256": "f3c58906402b24f3a96d92145f58acba6d86c9b5db896d207f78dc80811efcea",
+      "unzipTo": "piper",
+      "keepTree": true,
+      "stripPrefix": "piper/"
+    },
+    "piper-ru-irina-onnx": {
+      "title": "Голос Piper: Русский, Ирина",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
+      "size": 63201294,
+      "sha256": "8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa",
+      "path": "piper-ru-irina/ru_RU-irina-medium.onnx"
+    },
+    "piper-ru-irina-json": {
+      "title": "Голос Piper: Русский, Ирина (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json",
+      "size": 4765,
+      "sha256": "c2ec28bb38e2b59e93b959b3e40348c1afebbd272f30fed5d41205d08e98a9d7",
+      "path": "piper-ru-irina/ru_RU-irina-medium.onnx.json"
+    },
+    "piper-ru-dmitri-onnx": {
+      "title": "Голос Piper: Русский, Дмитрий",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx",
+      "size": 63201294,
+      "sha256": "f073356ebc4bd0f80c5af58df2953a5988bd5bdab1eb38635ce960b071fbefcb",
+      "path": "piper-ru-dmitri/ru_RU-dmitri-medium.onnx"
+    },
+    "piper-ru-dmitri-json": {
+      "title": "Голос Piper: Русский, Дмитрий (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx.json",
+      "size": 4824,
+      "sha256": "667ef3117bc642c2892dff7690d8bdc8ca4228aeaa783b2dc1416df632855e0d",
+      "path": "piper-ru-dmitri/ru_RU-dmitri-medium.onnx.json"
+    },
+    "piper-it-paola-onnx": {
+      "title": "Голос Piper: Итальянский, Паола",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/it/it_IT/paola/medium/it_IT-paola-medium.onnx",
+      "size": 63511038,
+      "sha256": "6fc918b5a0ea6137382833dddfa567bffbe6a5060c02043c87192ee59c04210c",
+      "path": "piper-it-paola/it_IT-paola-medium.onnx"
+    },
+    "piper-it-paola-json": {
+      "title": "Голос Piper: Итальянский, Паола (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/it/it_IT/paola/medium/it_IT-paola-medium.onnx.json",
+      "size": 7099,
+      "sha256": "aea19c0a7fce29fbc359b93f10e7902854401e4c95ae2ea328ae516b15d296cf",
+      "path": "piper-it-paola/it_IT-paola-medium.onnx.json"
+    },
+    "piper-es-davefx-onnx": {
+      "title": "Голос Piper: Испанский, Дэйв",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/davefx/medium/es_ES-davefx-medium.onnx",
+      "size": 63201294,
+      "sha256": "6658b03b1a6c316ee4c265a9896abc1393353c2d9e1bca7d66c2c442e222a917",
+      "path": "piper-es-davefx/es_ES-davefx-medium.onnx"
+    },
+    "piper-es-davefx-json": {
+      "title": "Голос Piper: Испанский, Дэйв (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/es/es_ES/davefx/medium/es_ES-davefx-medium.onnx.json",
+      "size": 4817,
+      "sha256": "0e0dda87c732f6f38771ff274a6380d9252f327dca77aa2963d5fbdf9ec54842",
+      "path": "piper-es-davefx/es_ES-davefx-medium.onnx.json"
+    },
+    "piper-de-thorsten-onnx": {
+      "title": "Голос Piper: Немецкий, Торстен",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx",
+      "size": 63201294,
+      "sha256": "7e64762d8e5118bb578f2eea6207e1a35a8e0c30595010b666f983fc87bb7819",
+      "path": "piper-de-thorsten/de_DE-thorsten-medium.onnx"
+    },
+    "piper-de-thorsten-json": {
+      "title": "Голос Piper: Немецкий, Торстен (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json",
+      "size": 4819,
+      "sha256": "974adee790533adb273a1ac88f49027d2a1b8f0f2cf4905954a4791e79264e85",
+      "path": "piper-de-thorsten/de_DE-thorsten-medium.onnx.json"
+    },
+    "piper-fr-siwis-onnx": {
+      "title": "Голос Piper: Французский, Сивис",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx",
+      "size": 63201294,
+      "sha256": "641d1ab097da2b81128c076810edb052b385decc8be3381814802a64a73baf99",
+      "path": "piper-fr-siwis/fr_FR-siwis-medium.onnx"
+    },
+    "piper-fr-siwis-json": {
+      "title": "Голос Piper: Французский, Сивис (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/fr/fr_FR/siwis/medium/fr_FR-siwis-medium.onnx.json",
+      "size": 4875,
+      "sha256": "39479916c2db192b5ac9764daddd0c744d83e023ad890c6976c0633ae4df8959",
+      "path": "piper-fr-siwis/fr_FR-siwis-medium.onnx.json"
+    },
+    "piper-en-lessac-onnx": {
+      "title": "Голос Piper: Английский, Лессак",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+      "size": 63201294,
+      "sha256": "5efe09e69902187827af646e1a6e9d269dee769f9877d17b16b1b46eeaaf019f",
+      "path": "piper-en-lessac/en_US-lessac-medium.onnx"
+    },
+    "piper-en-lessac-json": {
+      "title": "Голос Piper: Английский, Лессак (настройки)",
+      "url": "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
+      "size": 4885,
+      "sha256": "efe19c417bed055f2d69908248c6ba650fa135bc868b0e6abb3da181dab690a0",
+      "path": "piper-en-lessac/en_US-lessac-medium.onnx.json"
     }
   },
   "profiles": {
@@ -192,6 +341,87 @@
       "files": [
         "realesrgan-x4",
         "sd-vulkan-upscaler"
+      ]
+    },
+    "llama": {
+      "version": "b11269",
+      "files": [
+        "llama-cuda12",
+        "llama-cudart12"
+      ]
+    },
+    "llama-vulkan": {
+      "version": "b11269",
+      "files": [
+        "llama-vulkan-zip"
+      ]
+    },
+    "tts-model": {
+      "version": "Qwen3-TTS 1.7B Q4",
+      "files": [
+        "qwen3-tts-q4",
+        "qwen3-tts-mmproj"
+      ]
+    },
+    "llm-model": {
+      "version": "Qwen3 4B Q4",
+      "files": [
+        "qwen3-4b-llm"
+      ]
+    },
+    "piper": {
+      "version": "2023.11.14-2",
+      "files": [
+        "piper-zip"
+      ]
+    },
+    "piper-ru-irina": {
+      "version": "medium",
+      "files": [
+        "piper-ru-irina-onnx",
+        "piper-ru-irina-json"
+      ]
+    },
+    "piper-ru-dmitri": {
+      "version": "medium",
+      "files": [
+        "piper-ru-dmitri-onnx",
+        "piper-ru-dmitri-json"
+      ]
+    },
+    "piper-it-paola": {
+      "version": "medium",
+      "files": [
+        "piper-it-paola-onnx",
+        "piper-it-paola-json"
+      ]
+    },
+    "piper-es-davefx": {
+      "version": "medium",
+      "files": [
+        "piper-es-davefx-onnx",
+        "piper-es-davefx-json"
+      ]
+    },
+    "piper-de-thorsten": {
+      "version": "medium",
+      "files": [
+        "piper-de-thorsten-onnx",
+        "piper-de-thorsten-json"
+      ]
+    },
+    "piper-fr-siwis": {
+      "version": "medium",
+      "files": [
+        "piper-fr-siwis-onnx",
+        "piper-fr-siwis-json"
+      ]
+    },
+    "piper-en-lessac": {
+      "version": "medium",
+      "files": [
+        "piper-en-lessac-onnx",
+        "piper-en-lessac-json"
       ]
     }
   }

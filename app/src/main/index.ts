@@ -43,6 +43,8 @@ import { deletePreset, phraseToPrompt, presetInfos, putPreset, setPresetsDir, ty
 import { searchWorks, workDetails, type WorkDetails, type WorkHit } from "../core/ai/works";
 import { setLaunchBase, stopLocalServers } from "../core/ai/localServer";
 import { componentsDir, setComponentsDirOverride } from "./components";
+import { speak as voiceSpeak, translate as voiceTranslate, voiceState } from "./tts";
+import type { SpeakRequest, VoiceKeepInfo } from "../core/tts/types";
 import { probeSystem } from "./system";
 import { CHATGPT_DIR, findClaudeSkill, setupAssistant } from "./assistantKit";
 import { adoptFolder, installProfile, installTool, loadManifest, removeModel, removeTool, selfUpdateYtdlp, toolInstalled, ytdlpCheckDue, YTDLP_DIR } from "./modelInstall";
@@ -1350,6 +1352,56 @@ function registerIpc() {
     await addRecord(dir, meta);
     const [media] = await addMediaFiles([full]);
     if (!media) throw new Error("картинка не легла в пак");
+    await linkToPack(dir, file, media.folder, media.name);
+    return media;
+  });
+
+  // ---------- перевод + озвучка (tts.ts) ----------
+  let voiceAbort: AbortController | undefined;
+  ipcMain.handle("voice:state", () => voiceState(baseDir()));
+  ipcMain.handle("voice:translate", async (_e, text: string, target: string, custom: string, allowCloud: boolean) => {
+    voiceAbort = new AbortController();
+    return voiceTranslate(baseDir(), text, target, custom, { allowCloud }, voiceAbort.signal);
+  });
+  ipcMain.handle("voice:speak", async (_e, req: SpeakRequest) => {
+    voiceAbort = new AbortController();
+    const path = await voiceSpeak(baseDir(), req, voiceAbort.signal);
+    return { path, mime: "audio/wav", data: new Uint8Array(await readFile(path)) };
+  });
+  ipcMain.handle("voice:cancel", () => voiceAbort?.abort());
+  /** Озвучку — в библиотеку оригиналом (wav) и в пак копией (mp3; без ffmpeg остаётся wav). */
+  ipcMain.handle("voice:keep", async (_e, wavPath: string, info: VoiceKeepInfo) => {
+    const tmp = join(tmpdir(), "ye-voice");
+    if (resolvePath(dirname(wavPath)).toLowerCase() !== resolvePath(tmp).toLowerCase() || !/\.wav$/i.test(wavPath)) throw new Error("это не озвучка");
+    const dir = currentSourceDir();
+    await mkdir(dir, { recursive: true });
+    const base = ("озвучка - " + info.text).replace(/[\/:*?"<>|\r\n]/g, "_").replace(/\s+/g, " ").replace(/[.\s]+$/g, "").trim().slice(0, 80) || "озвучка";
+    let file = base + ".wav";
+    for (let i = 2; existsSync(join(dir, file)); i++) file = `${base} (${i}).wav`;
+    const full = join(dir, file);
+    await copyFile(wavPath, full);
+    const meta: SourceMeta = {
+      providerId: "ИИ",
+      title: info.text,
+      author: [info.engine === "gpu" ? "Qwen3-TTS" : "Piper", info.lang].join(" · "),
+      license: "озвучено ИИ",
+      fetchedAt: new Date().toISOString(),
+      file,
+      sizeBytes: (await stat(full)).size,
+      prompt: info.original,
+    };
+    await addRecord(dir, meta);
+    let forPack = full;
+    if (ffmpegAvailable()) {
+      const mp3 = full.replace(/\.wav$/i, ".mp3");
+      try {
+        const sec = (await probe(full)).durationSec;
+        await transcode({ input: full, output: mp3, start: 0, end: Math.max(0.1, sec), audio: "only", quality: "normal" });
+        forPack = mp3;
+      } catch { /* не вышло — в пак пойдёт wav */ }
+    }
+    const [media] = await addMediaFiles([forPack]);
+    if (!media) throw new Error("озвучка не легла в пак");
     await linkToPack(dir, file, media.folder, media.name);
     return media;
   });

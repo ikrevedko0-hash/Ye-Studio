@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import type { ComponentsState, InstallProgress } from "../../core/components/manifest";
 import type { FirstRunOptions, UpdateStatus } from "../../shared/api";
 import type { ProfileId, SystemReport } from "../../core/system/probe";
+import { PIPER_VOICES } from "../../core/components/voices";
 import { Icon } from "./Icon";
 
 const plainError = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
@@ -105,6 +106,29 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
   const checks = report?.profile.checks.filter((c) => c.profile.id !== "cloud") ?? [];
   const bytesOf = (id: ProfileId) => state?.profiles.find((p) => p.id === id)?.bytes ?? 0;
   const t = report?.tools;
+  // сборка llama.cpp с CUDA есть только для NVIDIA; для AMD/Intel и неизвестной карты — Vulkan
+  const nvidia = !!report?.gpus.some((g) => /nvidia|geforce|rtx|gtx/i.test(g.name));
+
+  /** Одна строка «Перевод и голос»: программа из манифеста, поставить/удалить. */
+  const voiceRow = (id: string, title: string, what: string, dim = false) => {
+    const st = state?.tools[id];
+    if (!st) return null;
+    return (
+      <div key={`${id}:${title}`} className="cmp-installed">
+        <span className={st.component ? "ok" : dim ? "muted" : "bad"}>{st.component ? `✓ ${title}` : `✗ ${title}`}</span>
+        <span className="muted">{what}</span>
+        <span className="spacer" />
+        {st.component ? (
+          <button className="small" disabled={busy || installing} onClick={() => void act(() => window.api.removeTool(id), `${title} удалён.`).then(refresh)}>Удалить</button>
+        ) : (
+          <button className={dim ? "small" : "primary"} disabled={busy || installing}
+            onClick={() => void act(() => { setProgress(null); return window.api.installTool(id); }, `${title} установлен.`).then(refresh)}>
+            Установить ({size(st.bytes)})
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="modal-back" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
@@ -185,6 +209,25 @@ export function Components({ onClose, firstRun }: { onClose(): void; firstRun?: 
             </div>
           )}
         </section>
+
+        {/* ---------- перевод и голос ---------- */}
+        {state && state.tools.llama && (
+          <section>
+            <h4>Перевод и голос</h4>
+            <div className="muted">Для «Латыни» и других иностранных ответов: перевести фразу и озвучить её. Всё работает на вашем компьютере, без интернета.</div>
+            <div className="cmp-tool-list">
+              <div className="muted"><b>Переводчик</b> — три варианта перевода с русского. Если в модели картинок уже стоит Qwen3 (8B или 4B), переводчик возьмёт её сам, отдельную модель ставить не нужно.</div>
+              {voiceRow(nvidia ? "llama" : "llama-vulkan", nvidia ? "Сервер llama.cpp (NVIDIA)" : "Сервер llama.cpp (Vulkan: AMD, Intel)", nvidia ? "запускает переводчика и голос на видеокарте" : "запускает переводчика на любой видеокарте")}
+              {voiceRow("llm-model", "Модель перевода Qwen3 4B", "нужна, только если Qwen3 из картинок не стоит")}
+              <div className="muted"><b>Голос на видеокарте (NVIDIA)</b> — живой голос, около секунды на фразу, 10 языков.</div>
+              {voiceRow("llama", "Сервер llama.cpp (NVIDIA)", "общий с переводчиком, ставится один раз", !nvidia)}
+              {voiceRow("tts-model", "Модель голоса Qwen3-TTS", "около 0,7 ГБ видеопамяти")}
+              <div className="muted"><b>Голос Piper (для слабых компьютеров)</b> — работает на процессоре, звучит проще. Каждый язык — отдельный голос.</div>
+              {voiceRow("piper", "Piper", "движок озвучки на процессоре")}
+              {PIPER_VOICES.map((v) => voiceRow(v.id, v.title, "голос Piper"))}
+            </div>
+          </section>
+        )}
 
         {/* ---------- обновления ---------- */}
         <section>

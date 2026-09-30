@@ -20,9 +20,12 @@ import { detectProfile, launchFor, mergeManifest, MODEL_DIR, parseManifest, plan
 import type { ProfileId } from "../core/system/probe";
 import type { InstallProgress } from "../core/components/manifest";
 import { SIGAME_COMPONENT } from "../core/sigame/component";
+import { treeTarget } from "../core/components/unzipPath";
+import { VOICE_TOOL_MAIN } from "../core/components/voices";
 
 export type { InstallProgress };
 import { readComponents, saveComponent, forgetComponent } from "./components";
+import BUNDLED_MANIFEST from "../../resources/components.json";
 
 
 export const SD_PROVIDER_ID = "sdcpp";
@@ -124,6 +127,39 @@ function unzipFlat(zipPath: string, toDir: string, only?: string[]): Promise<num
 }
 
 /**
+ * Распаковать архив с сохранением папок (keepTree), срезав stripPrefix: Piper ищет espeak-ng-data/ рядом с exe.
+ * Пути с «..», абсолютные и с диском пропускаются (см. treeTarget); подпапки создаются по ходу.
+ */
+export function unzipTree(zipPath: string, toDir: string, stripPrefix?: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
+      if (err || !zip) return reject(err ?? new Error("архив не открылся"));
+      let count = 0;
+      zip.on("error", reject);
+      zip.on("end", () => resolve(count));
+      zip.on("entry", (e: yauzl.Entry) => {
+        const parts = treeTarget(e.fileName, stripPrefix);
+        if (!parts) return zip.readEntry();
+        const target = join(toDir, ...parts);
+        zip.openReadStream(e, (err2, stream) => {
+          if (err2 || !stream) return reject(err2 ?? new Error("файл в архиве не читается"));
+          mkdir(dirname(target), { recursive: true })
+            .then(() => pipeline(stream, createWriteStream(target)))
+            .then(() => { count++; zip.readEntry(); })
+            .catch(reject);
+        });
+      });
+      zip.readEntry();
+    });
+  });
+}
+
+/** Распаковать по правилам файла манифеста: плоско (по умолчанию) или с деревом. */
+function unzipFor(f: { keepTree?: boolean; stripPrefix?: string; extract?: string[] }, zipPath: string, toDir: string): Promise<number> {
+  return f.keepTree ? unzipTree(zipPath, toDir, f.stripPrefix) : unzipFlat(zipPath, toDir, f.extract);
+}
+
+/**
  * Прописать локальный сервер в providers.json и поставить его первым в очередь картинок.
  * Остальное в файле (ключи, очереди текста, заметки) не трогаем; перед записью — копия .bak.
  */
@@ -148,7 +184,9 @@ export async function registerLocalServer(baseDir: string, launch: { exe: string
 }
 
 export async function loadManifest(resourcesDir: string): Promise<Manifest> {
-  const m = parseManifest(await readFile(join(resourcesDir, "components.json"), "utf8"));
+  // манифест вшит в код: `npm run code` и обновления кода не трогают resources/ установленной оболочки,
+  // а новые компоненты (голос, переводчик) должны появляться сразу; файл из resources — запасной
+  const m = parseManifest(BUNDLED_MANIFEST ? JSON.stringify(BUNDLED_MANIFEST) : await readFile(join(resourcesDir, "components.json"), "utf8"));
   // компонент «Прогон в SIGame» описан в коде (core/sigame/component.ts) — проверяем его тем же разбором
   return SIGAME_COMPONENT ? parseManifest(JSON.stringify(mergeManifest(m, SIGAME_COMPONENT))) : m;
 }
@@ -205,7 +243,7 @@ export async function installProfile(opts: {
       onProgress({ phase: "unzip", ...base, done: before });
       const to = join(modelDir, f.unzipTo);
       await mkdir(to, { recursive: true });
-      await unzipFlat(dest, to, f.extract);
+      await unzipFor(f, dest, to);
       await writeFile(marker, new Date().toISOString());
       await rm(dest, { force: true }); // архив больше не нужен — сотни мегабайт
     }
@@ -254,7 +292,7 @@ export async function removeModel(componentsDir: string, baseDir: string): Promi
 export const YTDLP_DIR = "yt-dlp";
 
 /** Главный файл программы-компонента: по нему решаем «стоит». Папка программы — её id. */
-export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe", sigame: "runner/sigame-runner.exe" };
+export const TOOL_MAIN: Record<string, string> = { "yt-dlp": "yt-dlp.exe", ffmpeg: "ffmpeg.exe", upscaler: "sd-cli.exe", sigame: "runner/sigame-runner.exe", ...VOICE_TOOL_MAIN };
 
 export function toolInstalled(componentsDir: string, tool: string): boolean {
   return existsSync(join(componentsDir, tool, TOOL_MAIN[tool] ?? ""));
@@ -280,7 +318,7 @@ export async function installTool(opts: { manifest: Manifest; tool: string; comp
       opts.onProgress({ phase: "unzip", ...base, done: before });
       const to = join(componentsDir, f.unzipTo);
       await mkdir(to, { recursive: true });
-      await unzipFlat(dest, to, f.extract);
+      await unzipFor(f, dest, to);
       await rm(dest, { force: true });
     }
   }

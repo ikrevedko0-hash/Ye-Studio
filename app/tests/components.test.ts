@@ -6,7 +6,42 @@ import { join, win32 } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { detectProfile, launchFor, parseManifest, planProfile, planTool, totalBytes, type Manifest } from "../src/core/components/manifest";
 import { ytdlpCommand } from "../src/core/media/providers/youtube";
-import { downloadResumable } from "../src/main/modelInstall";
+import { downloadResumable, TOOL_MAIN, unzipTree } from "../src/main/modelInstall";
+import { treeTarget } from "../src/core/components/unzipPath";
+import { PIPER_VOICES } from "../src/core/components/voices";
+import { ttsPaths } from "../src/main/voiceComponents";
+import { deflateRawSync } from "node:zlib";
+
+/** Маленький zip в памяти (deflate) — для теста распаковки. */
+function crc32(b: Buffer): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < b.length; i++) {
+    let c = (crc ^ b[i]) & 0xff;
+    for (let k = 0; k < 8; k++) c = c & 1 ? (c >>> 1) ^ 0xedb88320 : c >>> 1;
+    crc = (crc >>> 8) ^ c;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+function makeZip(files: Record<string, string>): Buffer {
+  const locals: Buffer[] = [], central: Buffer[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const nm = Buffer.from(name), raw = Buffer.from(text), data = deflateRawSync(raw), crc = crc32(raw);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(8, 8);
+    lh.writeUInt32LE(crc, 14); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(raw.length, 22); lh.writeUInt16LE(nm.length, 26);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6); ch.writeUInt16LE(8, 10);
+    ch.writeUInt32LE(crc, 16); ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(raw.length, 24); ch.writeUInt16LE(nm.length, 28); ch.writeUInt32LE(offset, 42);
+    locals.push(lh, nm, data); central.push(ch, nm);
+    offset += 30 + nm.length + data.length;
+  }
+  const cd = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(Object.keys(files).length, 8); end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, cd, end]);
+}
 
 const manifest: Manifest = parseManifest(readFileSync(join(__dirname, "..", "resources", "components.json"), "utf8"));
 const GB = 1073741824;
@@ -174,5 +209,120 @@ describe("компонент «Прогон в SIGame» из кода", () => {
     const files = planTool(m, "sigame");
     expect(files.map((f) => f.unzipTo)).toEqual(["sigame/runner", "sigame/table"]);
     for (const f of files) expect(f.url).toMatch(/^https:\/\/github\.com\/ikrevedko0-hash\/Ye-Studio\/releases\/download\/sigame-[^/]+\/[^/]+\.zip$/);
+  });
+});
+
+describe("Перевод и голос в манифесте", () => {
+  it("llama: CUDA-сборка и cudart в одну папку, Vulkan — отдельно; размеры и версии", () => {
+    const files = planTool(manifest, "llama");
+    expect(files.map((f) => f.unzipTo)).toEqual(["llama", "llama"]);
+    expect(totalBytes(files)).toBe(264528976 + 391443627);
+    expect(planTool(manifest, "llama-vulkan").map((f) => f.unzipTo)).toEqual(["llama-vulkan"]);
+    expect(manifest.tools?.llama.version).toBe("b11269");
+  });
+
+  it("модели: голос — два gguf в tts-model/, перевод — Qwen3 4B в llm-model/", () => {
+    expect(planTool(manifest, "tts-model").map((f) => f.dest)).toEqual([
+      "tts-model/Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf",
+      "tts-model/mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf",
+    ]);
+    expect(planTool(manifest, "llm-model").map((f) => f.dest)).toEqual(["llm-model/Qwen3-4B-Q4_K_M.gguf"]);
+  });
+
+  it("Piper распаковывается с деревом и срезом piper/; семь голосов по два файла", () => {
+    const [zip] = planTool(manifest, "piper");
+    expect(zip.keepTree).toBe(true);
+    expect(zip.stripPrefix).toBe("piper/");
+    expect(PIPER_VOICES).toHaveLength(7);
+    for (const v of PIPER_VOICES) {
+      const files = planTool(manifest, v.id);
+      expect(files).toHaveLength(2);
+      expect(files[0].dest).toBe(`${v.id}/${v.onnx}`);
+      expect(files[1].dest).toBe(`${v.id}/${v.onnx}.json`);
+    }
+  });
+
+  it("TOOL_MAIN знает главный файл каждой новой программы", () => {
+    for (const id of ["llama", "llama-vulkan", "tts-model", "llm-model", "piper", ...PIPER_VOICES.map((v) => v.id)]) {
+      expect(TOOL_MAIN[id]).toBeTruthy();
+      expect(manifest.tools?.[id]).toBeTruthy();
+    }
+  });
+
+  it("keepTree/stripPrefix проверяются при разборе манифеста", () => {
+    const one = (extra: string) => `{"files":{"a":{"title":"a","url":"https://x/a.zip","size":1,"sha256":"${"0".repeat(64)}","unzipTo":"a"${extra}}},"profiles":{}}`;
+    expect(() => parseManifest(one(',"keepTree":true,"stripPrefix":"piper/"'))).not.toThrow();
+    expect(() => parseManifest(one(',"stripPrefix":"piper/"'))).toThrow(/keepTree/);
+    expect(() => parseManifest(one(',"keepTree":true,"stripPrefix":"../"'))).toThrow(/stripPrefix/);
+    expect(() => parseManifest(one(',"keepTree":"да"'))).toThrow(/keepTree/);
+  });
+});
+
+describe("распаковка с сохранением дерева", () => {
+  it("treeTarget срезает префикс и не пускает опасные пути", () => {
+    expect(treeTarget("piper/piper.exe", "piper/")).toEqual(["piper.exe"]);
+    expect(treeTarget("piper/espeak-ng-data/ru_dict", "piper/")).toEqual(["espeak-ng-data", "ru_dict"]);
+    expect(treeTarget("a/b.txt")).toEqual(["a", "b.txt"]);
+    expect(treeTarget("piper/", "piper/")).toBeNull();
+    expect(treeTarget("other/x.dll", "piper/")).toBeNull();
+    expect(treeTarget("piper/../evil.dll", "piper/")).toBeNull();
+    expect(treeTarget("/etc/passwd")).toBeNull();
+    expect(treeTarget("C:/x.dll")).toBeNull();
+    expect(treeTarget("piper\\x.dll", "piper/")).toBeNull();
+  });
+
+  it("unzipTree кладёт файлы по дереву без префикса", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "zt-"));
+    try {
+      const zip = join(dir, "t.zip");
+      writeFileSync(zip, makeZip({ "piper/piper.exe": "EXE", "piper/espeak-ng-data/voices/ru": "RU", "outside.txt": "O" }));
+      const to = join(dir, "out");
+      const n = await unzipTree(zip, to, "piper/");
+      expect(n).toBe(2);
+      expect(readFileSync(join(to, "piper.exe"), "utf8")).toBe("EXE");
+      expect(readFileSync(join(to, "espeak-ng-data", "voices", "ru"), "utf8")).toBe("RU");
+      // архив с ".." yauzl отвергает сам, treeTarget — вторая линия защиты
+      writeFileSync(join(dir, "bad.zip"), makeZip({ "piper/../evil.txt": "X" }));
+      await expect(unzipTree(join(dir, "bad.zip"), to, "piper/")).rejects.toThrow();
+      expect(existsSync(join(dir, "evil.txt"))).toBe(false);
+      expect(existsSync(join(to, "outside.txt"))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ttsPaths", () => {
+  const C = "C:\\c";
+  const has = (...paths: string[]) => (p: string) => paths.includes(p);
+  it("ничего не стоит — пусто", () => {
+    expect(ttsPaths(C, [], () => false)).toEqual({ piperVoices: [] });
+  });
+  it("CUDA-llama, голос, Piper и голос; модель перевода из картинок раньше компонента", () => {
+    const p = ttsPaths(C, [], has(
+      join(C, "llama", "llama-server.exe"), join(C, "llama", "llama-tts.exe"),
+      join(C, "tts-model", "Qwen3-TTS-12Hz-1.7B-Base-Q4_K_M.gguf"), join(C, "tts-model", "mmproj-Qwen3-TTS-12Hz-1.7B-Base-Q8_0.gguf"),
+      join(C, "piper", "piper.exe"), join(C, "piper-ru-irina", "ru_RU-irina-medium.onnx"),
+      join(C, "llm-model", "Qwen3-4B-Q4_K_M.gguf"), join(C, "model", "models", "text_encoders", "Qwen3-8B-Q4_K_M.gguf"),
+    ));
+    expect(p.llamaServer).toBe(join(C, "llama", "llama-server.exe"));
+    expect(p.llamaTts).toBeTruthy();
+    expect(p.ttsModel && p.ttsMmproj).toBeTruthy();
+    expect(p.piper).toBeTruthy();
+    expect(p.piperVoices.map((v) => [v.id, v.lang])).toEqual([["piper-ru-irina", "ru"]]);
+    expect(p.llmModel).toBe(join(C, "model", "models", "text_encoders", "Qwen3-8B-Q4_K_M.gguf"));
+    expect(p.llmSource).toBe("images");
+    expect(p.llmModelComponent).toBe(join(C, "llm-model", "Qwen3-4B-Q4_K_M.gguf"));
+  });
+  it("только Vulkan и своя папка картинок", () => {
+    const own = "D:\\local-image";
+    const p = ttsPaths(C, [own], has(join(C, "llama-vulkan", "llama-server.exe"), join(own, "models", "text_encoders", "Qwen3-4B-Q4_K_M.gguf")));
+    expect(p.llamaServer).toBe(join(C, "llama-vulkan", "llama-server.exe"));
+    expect(p.llamaTts).toBeUndefined();
+    expect(p.llmSource).toBe("images");
+  });
+  it("без Qwen3 картинок берётся компонент", () => {
+    const p = ttsPaths(C, [], has(join(C, "llm-model", "Qwen3-4B-Q4_K_M.gguf")));
+    expect(p.llmSource).toBe("component");
   });
 });

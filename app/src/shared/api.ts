@@ -54,6 +54,7 @@ export interface PhraseDictionary {
   kinds: { id: string; title: string }[];
   styles: { id: string; title: string }[];
 }
+import type { SpeakRequest, TranslateResult, VoiceKeepInfo, VoiceSpeakResult, VoiceState } from "../core/tts/types";
 import type { AiSettings, ProviderEdit, ProviderTemplate } from "../core/ai/settings";
 
 export type { DictStats, GeneratorArgs, GeneratorInfo, PuzzleTheme, WordHit };
@@ -375,6 +376,17 @@ export interface Api {
   /** Картинку от ИИ — оригиналом в библиотеку (с моделью, стилем и сценой) и копией в пак. */
   imageKeep(dataUrl: string, phrase: string, info: { model: string; style?: string; prompt: string }): Promise<MediaInfo>;
   imageCancel(): Promise<void>;
+  // ---------- перевод + озвучка ----------
+  /** Что установлено: движки озвучки, голоса Piper, есть ли переводчик. */
+  voiceState(): Promise<VoiceState>;
+  /** Перевод фразы: до трёх вариантов. target — id из core/tts/languages (none, la, en, …, custom); custom — инструкция для «Свой вариант». Облако — только при allowCloud. */
+  voiceTranslate(text: string, target: string, custom: string, allowCloud: boolean): Promise<TranslateResult>;
+  /** Озвучить: wav во временной папке + байты для предпросмотра (Blob → URL.createObjectURL). */
+  voiceSpeak(req: SpeakRequest): Promise<VoiceSpeakResult>;
+  /** Оставить озвучку: оригинал — в библиотеку, mp3 (или wav без ffmpeg) — в пак. */
+  voiceKeep(wavPath: string, info: VoiceKeepInfo): Promise<MediaInfo>;
+  /** Прервать перевод или озвучку. */
+  voiceCancel(): Promise<void>;
   // ---------- настройки ИИ ----------
   aiSettings(): Promise<AiSettings>;
   aiSettingsSave(s: AiSettings): Promise<AiSettings>;
