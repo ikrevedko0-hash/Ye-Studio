@@ -131,3 +131,44 @@ describe("план и вставка", () => {
     expect(opt.right).toEqual(["B", "тонет"]);
   });
 });
+
+describe("голос ведущего и награда за ответ", () => {
+  it("старый json без новых полей: ни реплики, ни <wrong>, ни ответа-подписи", () => {
+    const { pkg, rows } = run({ themes: [{ round: 1, name: "Кино", questions: [q(300, "Аватар")] }] });
+    expect(rows[0].q).toMatchObject({ wrong: [], host: undefined, answerText: undefined, bonus: undefined });
+    applyInsert(pkg, rows);
+    const q300 = pkg.rounds![0].themes![0].questions![2];
+    expect(q300.wrong).toBeUndefined();
+    expect(questionItems(q300).some((i) => i.placement === "replic")).toBe(false);
+    expect(q300.params!.some((p) => p.name === "answer")).toBe(false);
+  });
+
+  it("wrong → <wrong>, host → реплика, answerText → подпись к картинке ответа, bonus — в текст", () => {
+    const { pkg, rows } = run({ themes: [{ round: 1, name: "Кино", questions: [
+      q(300, "Mafia II", {
+        wrong: ["Нет, это не GTA", "GTA IV"], host: "Смотрим внимательно, это важно",
+        answerText: "Mafia II (2010) — да, та самая", bonus: "x2, если назовёте год", answerImage: "Mafia 2 обложка",
+      }),
+    ] }] });
+    applyInsert(pkg, rows, { [rows[0].key]: { answer: "mafia.jpg" } });
+    const back = parseContentXml(buildContentXml(pkg));
+    const q300 = back.rounds![0].themes![0].questions![2];
+    expect(q300.wrong).toEqual(["Нет, это не GTA", "GTA IV"]);
+    const items = questionItems(q300);
+    expect(items[0]).toMatchObject({ placement: "replic", value: "Смотрим внимательно, это важно" });
+    expect(items.at(-1)!.value).toBe("Вопрос за 300 (x2, если назовёте год)");
+    const ans = q300.params!.find((p) => p.name === "answer")!.children.map((c) => (c.kind === "item" ? c.item : null));
+    expect(ans).toMatchObject([{ type: "image", value: "mafia.jpg" }, { value: "Mafia II (2010) — да, та самая" }]);
+  });
+
+  it("видео пока не ищется: пометка в тексте и заметка к ответу", () => {
+    const { pkg, rows } = run({ themes: [{ round: 1, name: "Кино", questions: [
+      q(300, "Шрек", { video: "Шрек открывает дверь туалета", answerVideo: "Шрек финальная сцена", wrong: "Фиона" }),
+    ] }] });
+    expect(rows[0].q.wrong).toEqual(["Фиона"]);
+    applyInsert(pkg, rows);
+    const q300 = pkg.rounds![0].themes![0].questions![2];
+    expect(questionItems(q300)[0].value).toBe("Вопрос за 300 [🎬 найти: Шрек открывает дверь туалета]");
+    expect(q300.info?.comments).toContain("🎬 к ответу найти: Шрек финальная сцена");
+  });
+});
