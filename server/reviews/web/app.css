@@ -180,7 +180,7 @@ label.fld { display: block; font-weight: 750; margin: 18px 0 8px; }
 .home h1 { font-size: clamp(30px, 9vw, 42px); line-height: 1.02; margin: 18px 0 8px; font-weight: 900; }
 .home .sub { color: var(--ink-soft); margin: 0 auto; font-weight: 600; }
 .home .home-sky > .hint { margin: 10px auto 0; }
-.home .blurbs { display: grid; gap: 10px; margin: 16px auto 0; }
+.home .blurbs { display: grid; gap: 10px; align-items: start; margin: 16px auto 0; }
 .blurb { margin: 0; padding: 10px 14px; border-left: 3px solid var(--gold); border-radius: 0 12px 12px 0; background: rgba(255,255,255,.55); }
 .blurb blockquote { margin: 0; font: italic 600 17px/1.3 Georgia, "Times New Roman", serif; color: var(--ink); }
 .blurb figcaption { margin-top: 4px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
