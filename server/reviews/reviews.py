@@ -62,6 +62,17 @@ URLISH_RE = re.compile(r"(https?:|://|www\.|\.(ru|com|net|org|su|рф|io|me)\b)"
 CTRL_RE = re.compile(r"[\x00-\x1f\x7f​-‏‪-‮]")
 
 
+def blurb_text(text, limit: int = 160) -> str:
+    """Отзыв целиком, если короткий; иначе первые предложения до limit и «…»."""
+    text = " ".join(str(text or "").split())
+    if len(text) < 4 or re.search(r"https?:|www\.|\w\.(ru|com|рф|net|org|me|io)(?!\w)|@\w", text, re.I):
+        return ""   # ссылки и контакты на главную не выводим
+    if len(text) <= limit:
+        return text
+    cut = max(text.rfind(c, 0, limit) for c in ".!?")
+    return text[:cut + 1] if cut >= 40 else text[:limit].rsplit(" ", 1)[0] + "…"
+
+
 class Invalid(Exception):
     pass
 
@@ -283,6 +294,20 @@ class Store:
                 "select nick, depth, score from players where slug=? and nick!='' and hidden=0 and depth>=? "
                 "order by depth desc, score desc, updated asc limit ?", (slug, BOARD_MIN_DEPTH, limit)).fetchall()
         return [{"nick": n, "depth": d, "score": s} for n, d, s in rows]
+
+    def quotes(self, limit: int = 50) -> list:
+        """Свежие отзывы «автору» для главной, как цитаты критиков на обложке. Скрытые игроки не попадают."""
+        titles = {p["slug"]: p["title"] for p in self.packs()}
+        with self._db() as db:
+            rows = db.execute(
+                "select a.slug, a.value, p.nick, p.depth from answers a join players p on p.pid=a.pid and p.slug=a.slug "
+                "where a.key='txt:author' and p.hidden=0 order by a.ts desc limit ?", (limit * 2,)).fetchall()
+        out = []
+        for slug, value, nick, depth in rows:
+            text = blurb_text(json.loads(value) if value else "")
+            if slug in titles and text:
+                out.append({"text": text, "nick": nick, "depth": depth, "pack": titles[slug]})
+        return out[:limit]
 
     def hide(self, slug: str, nick: str) -> int:
         with self._db() as db:
