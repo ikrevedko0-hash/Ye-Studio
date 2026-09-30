@@ -8,6 +8,7 @@ import type { Engine, VoiceState } from "../../core/tts/types";
 import { TARGETS, TTS_LANGS, piperVoiceForLang, targetById } from "../../core/tts/languages";
 import type { PlacementOptions } from "../../core/tts/placement";
 import { Icon } from "./Icon";
+import { PhrasePicker } from "./PhrasePicker";
 
 interface Props {
   /** Озвучка (если есть) и тексты — в открытый вопрос по галочкам. Нет выбранного вопроса — нет кнопки. */
@@ -29,6 +30,16 @@ function loadPrefs(): Prefs {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") as Partial<Prefs>;
     return { ...def, ...p, place: { ...DEFAULT_PLACE, ...p.place } };
   } catch { return def; }
+}
+
+/** Фразы, уже озвученные в вопросы: словарь помечает их, чтобы не повторяться. Свой список — не общий с «Картинками». */
+const USED_KEY = "voiceStudio.usedPhrases";
+function loadUsed(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(USED_KEY) ?? "[]") as string[]);
+  } catch {
+    return new Set();
+  }
 }
 
 const plainError = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
@@ -53,6 +64,8 @@ export function VoiceStudio({ onInsert, insertTarget, onAdded, onOpenAi, onOpenC
   const [audio, setAudio] = useState<{ path: string; url: string; text: string; engine: Engine; lang: string } | null>(null);
   const [busy, setBusy] = useState<"" | "translate" | "speak" | "keep">("");
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
+  const [showDict, setShowDict] = useState(false);
+  const [used, setUsed] = useState(loadUsed);
   const player = useRef<HTMLAudioElement>(null);
 
   const target = targetById(prefs.target);
@@ -135,6 +148,11 @@ export function VoiceStudio({ onInsert, insertTarget, onAdded, onOpenAi, onOpenC
       }
       if (toQuestion && onInsert) {
         onInsert(media, prefs.place, { translated, original: phrase.trim() });
+        if (phrase.trim()) {
+          const next = new Set(used).add(phrase.trim());
+          setUsed(next);
+          try { localStorage.setItem(USED_KEY, JSON.stringify([...next])); } catch { /* пометка не запомнится — не беда */ }
+        }
         setNote({ text: `«${phrase.trim() || translated}» — в вопросе. Выбор перешёл к следующему — пишите новую фразу.` });
         setPhrase("");
         setText("");
@@ -197,12 +215,27 @@ export function VoiceStudio({ onInsert, insertTarget, onAdded, onOpenAi, onOpenC
               autoFocus
             />
           </label>
+          <button className={`ig-dict-toggle${showDict ? " sel" : ""}`} onClick={() => setShowDict(!showDict)} title="Выбрать фразу из словаря Викисловаря">
+            <Icon name="library" />Словарь
+          </button>
           {target.id !== "none" && (
             <button className="primary ws-run" onClick={() => void translate()} disabled={!!busy || !phrase.trim()}>
               {busy === "translate" ? "Перевожу…" : "Перевести"}
             </button>
           )}
         </div>
+
+        {showDict && (
+          <PhrasePicker
+            used={used}
+            onPick={(t) => {
+              setPhrase(t);
+              setVariants([]);
+              setVia("");
+              setText(target.id === "none" ? t : "");
+            }}
+          />
+        )}
 
         {target.id === "custom" && (
           <label className="ig-phrase">
