@@ -203,6 +203,13 @@ export function ProposalsPaste({ pkg, onClose, onInsert }: {
                     {!off.has(r.key) && !r.error && (
                       <>
                         {r.q.options.length > 0 && <div className="muted">варианты: {r.q.options.join(" · ")}</div>}
+                        {r.q.bonus && <div className="muted">зачёт: {r.q.bonus}</div>}
+                        {r.q.host && <div className="muted">🎙 ведущий: {r.q.host}</div>}
+                        {r.q.answerText && <div className="muted">на экране при ответе: {r.q.answerText}</div>}
+                        {r.q.wrong.length > 0 && <div className="muted">ведущему на ошибки: {r.q.wrong.join(" · ")}</div>}
+                        {(r.q.video || r.q.answerVideo) && (
+                          <div className="muted">🎬 видео найти вручную: {[r.q.video, r.q.answerVideo && `ответ — ${r.q.answerVideo}`].filter(Boolean).join("; ")}</div>
+                        )}
                         {r.q.image && thumbs(r, "question", r.q.image)}
                         {r.q.answerImage && thumbs(r, "answer", r.q.answerImage)}
                       </>
