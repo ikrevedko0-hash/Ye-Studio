@@ -7,11 +7,11 @@ import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, win32 } from "node:path";
 import { chat, type ChatResult } from "../core/ai/chat";
-import { findAiConfig, isLocal, type AiConfig, type AiProvider } from "../core/ai/config";
+import { findAiConfig, type AiConfig, type AiProvider } from "../core/ai/config";
 import { ensureLocalServer, stopLocalServer } from "../core/ai/localServer";
 import { piperVoiceForLang } from "../core/tts/languages";
 import type { SpeakRequest, TranslateResult, VoiceState } from "../core/tts/types";
-import { buildTranslateMessages, parseVariants } from "../core/tts/translate";
+import { buildTranslateMessages, parseVariants, translateStages } from "../core/tts/translate";
 import { componentPath, componentsDir } from "./components";
 import { SD_PROVIDER_ID } from "./modelInstall";
 import { ttsPaths, type TtsPaths } from "./voiceComponents";
@@ -35,19 +35,10 @@ async function paths(baseDir: string): Promise<TtsPaths> {
   return ttsPaths(componentsDir(), await imageModelDirs(baseDir));
 }
 
-/** Локальные текстовые сервисы из providers.json (LM Studio и т. п.), кроме нашего sd-server. */
-function localChain(cfg: AiConfig): string[] {
-  const out: string[] = [];
-  for (const [id, p] of Object.entries(cfg.providers)) {
-    if (p.disabled || !isLocal(p) || id === SD_PROVIDER_ID) continue;
-    for (const m of p.models ?? []) out.push(`${id}:${m}`);
-  }
-  return out;
-}
-
 export async function voiceState(baseDir: string): Promise<VoiceState> {
   const p = await paths(baseDir);
   const found = await findAiConfig(baseDir).catch(() => null);
+  const stages = translateStages(found?.cfg ?? null, true, false, SD_PROVIDER_ID);
   return {
     gpu: !!(p.llamaTts && p.ttsModel && p.ttsMmproj),
     piper: !!p.piper && p.piperVoices.length > 0,
@@ -55,7 +46,8 @@ export async function voiceState(baseDir: string): Promise<VoiceState> {
     translator: {
       own: !!(p.llamaServer && p.llmModel),
       model: p.llmModel ? basename(p.llmModel).replace(/-Q\d.*$/i, "") : undefined,
-      local: !!found && localChain(found.cfg).length > 0,
+      local: stages.some((s) => s.kind === "local"),
+      cloud: stages.flatMap((s) => (s.kind === "cloud" ? s.chain.map((ref) => ref.slice(ref.indexOf(":") + 1)) : [])),
     },
   };
 }
@@ -71,74 +63,56 @@ export async function translate(baseDir: string, text: string, target: string, c
   if (target === "none") return { variants: [clean], via: "без перевода" };
   const messages = buildTranslateMessages(clean, target, custom);
   const p = await paths(baseDir);
+  const found = await findAiConfig(baseDir).catch(() => null);
   const attempts: string[] = [];
 
   const finish = (r: ChatResult, via: string): TranslateResult => {
-    const variants = parseVariants(r.text);
+    const variants = parseVariants(r.text, target);
     if (!variants.length) throw new Error("модель вернула пустой ответ");
     return { variants, via };
   };
 
-  // 1. своя модель на своей видеокарте
-  if (p.llamaServer && p.llmModel) {
-    const provider: AiProvider = {
-      kind: "openai",
-      base: `http://127.0.0.1:${LLM_PORT}/v1`,
-      models: [LLM_ID],
-      extraBody: { chat_template_kwargs: { enable_thinking: false } },
-      launch: {
-        exe: p.llamaServer,
-        args: ["-m", p.llmModel, "--port", String(LLM_PORT), "-ngl", "99", "-c", "4096", "--alias", LLM_ID],
-        cwd: p.llamaDir,
-      },
-    };
+  for (const stage of translateStages(found?.cfg ?? null, !!opts.allowCloud, !!(p.llamaServer && p.llmModel), SD_PROVIDER_ID)) {
     try {
-      freeVram();
-      await ensureLocalServer(LLM_ID, provider, signal);
-      const cfg: AiConfig = { providers: { [LLM_ID]: provider }, chain: [`${LLM_ID}:${LLM_ID}`] };
-      const r = await chat(cfg, messages, signal, { temperature: 0.7 });
-      return finish(r, `${basename(p.llmModel).replace(/-Q\d.*$/i, "")}, своя видеокарта`);
+      if (stage.kind === "own") {
+        // своя модель на своей видеокарте — запасной путь: переводит хуже облака и долго грузится
+        const provider: AiProvider = {
+          kind: "openai",
+          base: `http://127.0.0.1:${LLM_PORT}/v1`,
+          models: [LLM_ID],
+          extraBody: { chat_template_kwargs: { enable_thinking: false } },
+          launch: {
+            exe: p.llamaServer!,
+            args: ["-m", p.llmModel!, "--port", String(LLM_PORT), "-ngl", "99", "-c", "4096", "--alias", LLM_ID],
+            cwd: p.llamaDir,
+          },
+        };
+        freeVram();
+        await ensureLocalServer(LLM_ID, provider, signal);
+        const cfg: AiConfig = { providers: { [LLM_ID]: provider }, chain: [`${LLM_ID}:${LLM_ID}`] };
+        const r = await chat(cfg, messages, signal, { temperature: 0.7 });
+        return finish(r, `${basename(p.llmModel!).replace(/-Q\d.*$/i, "")}, своя видеокарта`);
+      }
+      const cfg = found!.cfg;
+      if (stage.kind === "local") {
+        for (const ref of stage.chain) {
+          const id = ref.slice(0, ref.indexOf(":"));
+          await ensureLocalServer(id, cfg.providers[id], signal);
+        }
+      }
+      const r = await chat({ ...cfg, chain: stage.chain }, messages, signal, { temperature: 0.7 });
+      return finish(r, `${stage.kind === "cloud" ? "облако" : "локальный сервис"}: ${r.model}`);
     } catch (e) {
       if (signal?.aborted) throw new Error("отменено");
-      attempts.push(`своя модель: ${(e as Error).message}`);
-    }
-  }
-
-  // 2. локальные и (если разрешено) облачные сервисы из providers.json
-  const found = await findAiConfig(baseDir).catch(() => null);
-  if (found) {
-    const { cfg } = found;
-    const local = localChain(cfg);
-    const chains: { chain: string[]; via: string }[] = [];
-    if (local.length) chains.push({ chain: local, via: "локальный сервис" });
-    if (opts.allowCloud) {
-      const cloud = (cfg.chain ?? []).filter((ref) => {
-        const pr = cfg.providers[ref.slice(0, ref.indexOf(":"))];
-        return pr && !pr.disabled && !isLocal(pr);
-      });
-      if (cloud.length) chains.push({ chain: cloud, via: "облако" });
-    }
-    for (const { chain, via } of chains) {
-      try {
-        for (const ref of chain) {
-          const id = ref.slice(0, ref.indexOf(":"));
-          const pr = cfg.providers[id];
-          if (isLocal(pr)) await ensureLocalServer(id, pr, signal);
-        }
-        const r = await chat({ ...cfg, chain }, messages, signal, { temperature: 0.7 });
-        return finish(r, `${via}: ${r.model}`);
-      } catch (e) {
-        if (signal?.aborted) throw new Error("отменено");
-        attempts.push(`${via}: ${(e as Error).message}`);
-      }
+      attempts.push(`${stage.kind === "own" ? "своя модель" : stage.kind === "cloud" ? "облако" : "локальный сервис"}: ${(e as Error).message}`);
     }
   }
 
   const hint = attempts.length
     ? attempts.join(" · ")
     : opts.allowCloud
-      ? "нет ни своей модели, ни настроенных сервисов"
-      : "нет модели перевода. Поставьте «Перевод и голос» в «Компонентах» или разрешите облако";
+      ? "нет ни настроенных сервисов ИИ, ни своей модели"
+      : "нет локальной модели перевода. Разрешите облачные ИИ или поставьте переводчик в «Компонентах»";
   throw new Error(`Не удалось перевести: ${hint}`);
 }
 

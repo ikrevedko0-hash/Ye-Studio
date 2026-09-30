@@ -28,6 +28,8 @@ export interface VoiceState {
     model?: string;
     /** В providers.json есть локальные текстовые сервисы. */
     local: boolean;
+    /** Облачные модели из общей очереди (Gemini, Groq…), по порядку; пусто — облака нет. */
+    cloud: string[];
   };
 }
 

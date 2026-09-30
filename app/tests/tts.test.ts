@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TARGETS, piperVoiceForLang, targetById } from "../src/core/tts/languages";
-import { buildTranslateMessages, parseVariants } from "../src/core/tts/translate";
+import { buildTranslateMessages, fixMixedScript, parseVariants, translateStages } from "../src/core/tts/translate";
+import type { AiConfig } from "../src/core/ai/config";
 import { applyRight, applyToItems, planPlacement } from "../src/core/tts/placement";
 
 describe("цели перевода", () => {
@@ -69,5 +70,44 @@ describe("раскладка по вопросу и ответу", () => {
     expect(applyRight(["привет"], "Привет")).toEqual(["привет"]);
     expect(applyRight(["Здравствуй"], "Привет")).toEqual(["Здравствуй", "Привет"]);
     expect(applyRight(["x"], undefined)).toEqual(["x"]);
+  });
+});
+
+describe("порядок переводчиков", () => {
+  const cfg: AiConfig = {
+    providers: {
+      google: { kind: "openai", base: "https://generativelanguage.googleapis.com/v1beta/openai", models: ["gemini-3-flash-preview"] },
+      groq: { kind: "openai", base: "https://api.groq.com/openai/v1", models: ["openai/gpt-oss-120b"] },
+      off: { kind: "openai", base: "https://example.com/v1", models: ["x"], disabled: true },
+      lmstudio: { kind: "openai", base: "http://127.0.0.1:1234/v1", models: ["qwen3-30b"] },
+      sdcpp: { kind: "openai", base: "http://127.0.0.1:7861/v1", models: ["sd"] },
+    },
+    chain: ["groq:openai/gpt-oss-120b", "google:gemini-3-flash-preview", "off:x", "lmstudio:qwen3-30b"],
+  };
+  it("облако первым (в порядке общей очереди), потом локальные сервисы, своя модель — последней", () => {
+    expect(translateStages(cfg, true, true, "sdcpp")).toEqual([
+      { kind: "cloud", chain: ["groq:openai/gpt-oss-120b", "google:gemini-3-flash-preview"] },
+      { kind: "local", chain: ["lmstudio:qwen3-30b"] },
+      { kind: "own" },
+    ]);
+  });
+  it("без разрешения облака — только локально", () => {
+    expect(translateStages(cfg, false, false, "sdcpp")).toEqual([{ kind: "local", chain: ["lmstudio:qwen3-30b"] }]);
+    expect(translateStages(null, true, true, "sdcpp")).toEqual([{ kind: "own" }]);
+  });
+  it("латынь: подсказка с классической бранью", () => {
+    expect(buildTranslateMessages("хуй", "la")[0].content).toContain("mentula");
+    expect(buildTranslateMessages("хуй", "en")[0].content).not.toContain("mentula");
+  });
+});
+
+describe("чистка вариантов", () => {
+  it("русская «а» в латинском слове — латинская; русские слова целы", () => {
+    expect(fixMixedScript("Mulier ebri\u0430 non est")).toBe("Mulier ebria non est");
+    expect(fixMixedScript("пьяная баба")).toBe("пьяная баба");
+  });
+  it("латынь без долгот, другие языки — как есть", () => {
+    expect(parseVariants("culō meō sentīo\nsentio", "la")).toEqual(["culo meo sentio", "sentio"]);
+    expect(parseVariants("Ça va", "fr")).toEqual(["Ça va"]);
   });
 });
