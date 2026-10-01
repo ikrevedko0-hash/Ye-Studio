@@ -66,3 +66,15 @@ img.src=${JSON.stringify(opts.image)};
 </script></body></html>
 `;
 }
+
+/** Ступени «живого» проявления: от выбранного крупного пикселя к 64 блокам, геометрически, 8 шагов. */
+export function liveRevealBlocks(coarsest: number, finest = 64, steps = 8): number[] {
+  const a = Math.max(2, Math.round(coarsest));
+  const b = Math.max(a + 1, Math.round(finest));
+  const out: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    const v = Math.round(a * Math.pow(b / a, i / (steps - 1)));
+    if (!out.length || v > out[out.length - 1]) out.push(v);
+  }
+  return out;
+}

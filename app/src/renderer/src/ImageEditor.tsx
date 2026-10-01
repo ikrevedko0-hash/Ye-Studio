@@ -8,6 +8,7 @@ import {
   type CoverShape, type CoverStyle, type Frac, type OutFormat, type PixelPlan, type SilhouettePlan,
 } from "./imageCanvas";
 import { blockGrid, clampBlocks, PIXEL_BLOCKS, PIXEL_PRESETS, revealSteps } from "../../core/media/pixelate";
+import { buildPixelRevealHtml, liveRevealBlocks, REVEAL_DEFAULTS } from "../../core/siq/htmlReveal";
 import { worthUpscaling } from "../../core/media/upscale";
 import { UpscaleCompare } from "./UpscaleCompare";
 import type { MediaInfo } from "../../shared/api";
@@ -27,6 +28,8 @@ interface Props {
   onThemeByPrice?(): void;
   /** картинка из вопроса: проявление — несколько картинок подряд вместо одной */
   onReveal?(created: MediaInfo[], pauseSec: number): void;
+  /** картинка из вопроса: живое проявление — один HTML-вопрос вместо картинки */
+  onLiveReveal?(created: MediaInfo, seconds: number): void;
 }
 
 const RATIOS: Array<{ label: string; value: number | null }> = [
@@ -40,7 +43,7 @@ const RATIOS: Array<{ label: string; value: number | null }> = [
 
 const mb = (bytes: number) => (bytes >= 1048576 ? `${(bytes / 1048576).toFixed(2)} МБ` : `${Math.round(bytes / 1024)} КБ`);
 
-export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }: Props) {
+export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal, onLiveReveal }: Props) {
   const frameRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -119,6 +122,7 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
   const [pixRegion, setPixRegion] = useState<Frac | null>(null);
   const [revealCount, setRevealCount] = useState(4);
   const [revealPause, setRevealPause] = useState(3);
+  const [liveSeconds, setLiveSeconds] = useState<number>(REVEAL_DEFAULTS.seconds);
   const pickBlocks = (n: number) => { const b = clampBlocks(n); setBlocks(b); setBlocksDraft(String(b)); };
   const pixel: PixelPlan | undefined = pixelOn ? { blocks, region: pixRegion ?? undefined } : undefined;
 
@@ -264,6 +268,27 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
         created.push(m);
       }
       onReveal(created, revealPause);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Живое проявление: одна HTML-страница, картинка внутри проявляется по таймеру; оригинал — в ответ. */
+  const liveReveal = async () => {
+    if (!img || !onLiveReveal) return;
+    setBusy(true);
+    setError("");
+    try {
+      const side = Math.min(Number(maxSide) || 1600, 1600);
+      const out = renderImage(img, { covers, rotate, flip, crop: crop ?? undefined, maxSide: side, format, quality, silhouette: sil });
+      // силуэт прозрачный — PNG, иначе JPEG: HTML несёт картинку внутри и не должен разбухать
+      const image = sil ? exportCanvas(out, "png", 1) : exportCanvas(out, "jpeg", 0.9);
+      const html = buildPixelRevealHtml({ image, seconds: liveSeconds, blocks: liveRevealBlocks(blocks) });
+      const m = await window.api.saveHtml(html, `${media.name.replace(/\.[^.]+$/, "")} (живая пикселизация)`);
+      window.dispatchEvent(new CustomEvent("media-created", { detail: m }));
+      onLiveReveal(m, liveSeconds);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -432,6 +457,17 @@ export function ImageEditor({ media, onClose, onDone, onThemeByPrice, onReveal }
                       </label>
                     </div>
                     <p className="hint">Блоки: {revealSteps(blocks, revealCount).join(" → ")}. Оригинал — в ответ.</p>
+                    {onLiveReveal && (
+                      <>
+                        <div className="tool-row">
+                          <button onClick={liveReveal} disabled={busy || !img} title="Вместо картинки в вопрос встанет HTML: картинка сама проявляется из крупных пикселей по таймеру">Живое проявление (HTML)</button>
+                          <label className="inline-num" title="За сколько секунд картинка проявится целиком">
+                            за<input type="number" min={5} max={60} value={liveSeconds} onChange={(e) => setLiveSeconds(Math.max(5, Math.min(60, Number(e.target.value) || 20)))} />с
+                          </label>
+                        </div>
+                        <p className="hint">Блоки: {liveRevealBlocks(blocks).join(" → ")}. Играет в SIGame 7.13+; в предпросмотре Ye!Studio — просто файл HTML.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </div>

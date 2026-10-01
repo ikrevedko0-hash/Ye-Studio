@@ -485,6 +485,15 @@ export function QuestionEditor({ pack, selection, mutate, addMedia, onPriceCommi
               round: selection.round, theme: selection.theme, question: selection.question, name,
               items: created.map((c) => withDuration({ type: "image", isRef: "True", value: c.name }, pause)),
             }], "оригинал до проявления");
+          } : undefined}
+          onLiveReveal={editing.inQuestion ? (created, seconds) => {
+            const name = editing.media.name;
+            setEditing(null);
+            // живое проявление: один HTML вместо картинки, стоит seconds секунд; оригинал — в ответ или в source/
+            void replaceImages(pack, mutate, [{
+              round: selection.round, theme: selection.theme, question: selection.question, name,
+              items: [withDuration({ type: "html", isRef: "True", value: created.name }, seconds)],
+            }], "оригинал до живой пикселизации");
           } : undefined} />
       ) : (
         <MediaEditor media={editing.media} onClose={() => setEditing(null)} onDone={(created) => { editing.replace(created); setEditing(null); }} />

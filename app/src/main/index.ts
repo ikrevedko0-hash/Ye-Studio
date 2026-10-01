@@ -896,6 +896,19 @@ function registerIpc() {
     return mediaInfo(entry);
   });
 
+  /** HTML-вопрос (живая пикселизация): самодостаточная страница — новым файлом в Html. */
+  ipcMain.handle("html:save", async (_e, html: string, suggestedName: string) => {
+    if (typeof html !== "string" || !/^<!doctype html>/i.test(html)) throw new Error("не HTML-страница");
+    if (html.length > 15 * 1024 * 1024) throw new Error("HTML больше 15 МБ — уменьшите картинку");
+    const base = suggestedName.replace(/\.[^.]+$/, "").replace(/[\/:*?"<>|]/g, "_").slice(0, 80) || "вопрос";
+    const name = uniqueName("Html", base + ".html");
+    const out = join(tmpdir(), `siq-html-${Date.now()}.html`);
+    await writeFile(out, html, "utf8");
+    const entry: MediaEntry = { folder: "Html", name, size: (await stat(out)).size, source: { kind: "file", path: out } };
+    doc.media.set(key("Html", name), entry);
+    return mediaInfo(entry);
+  });
+
   /**
    * ИИ-увеличение (Real-ESRGAN ×4) в два шага: сначала предпросмотр — автор сравнивает с оригиналом
    * (у модели бывают мелкие артефакты), и только «Сохранить в пак» кладёт новый JPEG рядом с оригиналом.
