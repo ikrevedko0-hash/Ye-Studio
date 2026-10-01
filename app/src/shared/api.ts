@@ -12,6 +12,7 @@ import type { GeneratorArgs, PuzzleTheme, WordHit } from "../core/words/generato
 import type { ImagePreset } from "../core/ai/presetText";
 import type { WorkHit } from "../core/ai/works";
 import type { QuotaInfo } from "../core/ai/quota";
+import type { ImageModelInfo } from "../core/ai/image";
 import type { PhraseSet } from "../core/words/phrases";
 import type { ProfileId, SystemReport } from "../core/system/probe";
 import type { ComponentsState, InstallProgress } from "../core/components/manifest";
@@ -58,7 +59,7 @@ import type { SpeakRequest, TranslateResult, VoiceKeepInfo, VoiceSpeakResult, Vo
 import type { AiSettings, ProviderEdit, ProviderTemplate } from "../core/ai/settings";
 
 export type { DictStats, GeneratorArgs, GeneratorInfo, PuzzleTheme, WordHit };
-export type { AiSettings, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo, WorkHit };
+export type { AiSettings, ImageModelInfo, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo, WorkHit };
 
 /** Бесплатные модели не справились, платные есть — окно спрашивает автора. */
 export interface NeedPaid {
@@ -375,7 +376,10 @@ export interface Api {
   worksSearch(query: string): Promise<WorkHit[]>;
   /** style — id из imageStyles.ts: его английское описание дописывается к сцене. */
   /** ownStyle — свой английский текст стиля пресета: дописывается вместо стиля с галочки. */
-  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string, ownStyle?: string): Promise<GeneratedImage | NeedPaid>;
+  /** only — рисовать только этой моделью («провайдер:модель»), а не по очереди. */
+  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string, ownStyle?: string, only?: string): Promise<GeneratedImage | NeedPaid>;
+  /** Модели для выбора в окне «Картинки»: очередь и свои модели вне очереди. */
+  imageModels(): Promise<ImageModelInfo[]>;
   imageStyles(): Promise<ImageStyleInfo[]>;
   /** Картинку от ИИ — оригиналом в библиотеку (с моделью, стилем и сценой) и копией в пак. */
   imageKeep(dataUrl: string, phrase: string, info: { model: string; style?: string; prompt: string }): Promise<MediaInfo>;

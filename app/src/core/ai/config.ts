@@ -37,6 +37,10 @@ export interface AiProvider {
   paid?: boolean;
   /** Локальный сервер, который приложение само запускает, когда он не отвечает (см. localServer.ts). */
   launch?: { exe: string; args?: string[]; cwd?: string };
+  /** Модель без цензуры: в выборе модели помечается «без цензуры». */
+  uncensored?: boolean;
+  /** Дописать в начало промпта картинки: Pony без «score_9, score_8_up…» рисует заметно хуже. */
+  promptPrefix?: string;
 }
 
 /** Тип провайдера: задан явно — берём его, иначе узнаём Cloudflare по номеру аккаунта. */

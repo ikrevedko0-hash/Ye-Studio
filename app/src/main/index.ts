@@ -40,7 +40,7 @@ import { setWordSourceDirs, wordSourceDirs } from "../core/words/sources/registr
 import { loadPhrases, PHRASE_KINDS, PHRASE_STYLES } from "../core/words/phrases";
 import type { GeneratorArgs } from "../core/words/generators/types";
 import { findAiConfig, loadAiConfig } from "../core/ai/config";
-import { generateImage, NeedPaidError } from "../core/ai/image";
+import { generateImage, imageModelInfos, NeedPaidError } from "../core/ai/image";
 import { IMAGE_STYLES, styleText } from "../core/ai/imageStyles";
 import { deletePreset, phraseToPrompt, presetInfos, putPreset, setPresetsDir, type ImagePreset } from "../core/ai/imagePresets";
 import { searchWorks, workDetails, type WorkDetails, type WorkHit } from "../core/ai/works";
@@ -1326,14 +1326,16 @@ function registerIpc() {
     return searchWorks(query, worksAbort.signal);
   });
   ipcMain.handle("imagegen:styles", () => IMAGE_STYLES.map(({ id, title, about }) => ({ id, title, about })));
-  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string, ownStyle?: string) => {
+  // модели для выбора в окне: очередь и свои модели вне очереди (без цензуры)
+  ipcMain.handle("imagegen:models", async () => imageModelInfos((await loadAiConfig(baseDir())).cfg));
+  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string, ownStyle?: string, only?: string) => {
     imagegenAbort = new AbortController();
     const { cfg } = await loadAiConfig(baseDir());
     // стиль — хвостом к сцене: сцена в окне остаётся чистой, а смена стиля не требует новой сцены
     // ownStyle — свой текст стиля пресета (детский рисунок и пресеты автора) вместо галочки
     const full = [prompt.trim(), ownStyle?.trim() || styleText(style)].filter(Boolean).join(" ");
     try {
-      const r = await generateImage(cfg, { prompt: full, width, height }, imagegenAbort.signal, { allowPaid });
+      const r = await generateImage(cfg, { prompt: full, width, height }, imagegenAbort.signal, { allowPaid, only: only || undefined });
       return { dataUrl: `data:${r.mime};base64,${r.data.toString("base64")}`, model: r.model, ms: r.ms, skipped: r.skipped };
     } catch (e) {
       // из главного процесса в окно доходит только текст ошибки — «нужна платная» отдаём ответом
