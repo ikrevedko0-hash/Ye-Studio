@@ -3382,7 +3382,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "ИИ"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector("button.k-set") ?? byText(".file-actions button", "ИИ"); }
       if (!open) return { ok: false, why: "нет кнопки «⚙ ИИ» в шапке" };
       open.click();
       let refresh = null;
