@@ -2761,7 +2761,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       toggle.click();
       let list = null;
       for (let i = 0; i < 50 && !document.querySelector(".pp-item"); i++) await wait(100);
-      list = document.querySelector(".prp-list");
+      list = document.querySelector(".pp-list");
       const main = document.querySelector(".ig-main");
       return {
         ok: !!list, до: before, после: size(document.querySelector(".ig-stage")), словарь: size(document.querySelector(".pp")),
