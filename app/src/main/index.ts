@@ -2086,7 +2086,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         журнал: [...document.querySelectorAll(".pack-size .ps-log div")].map((d) => d.textContent) };
     })()`);
     const psShot = arg("pack-size-shot");
-    if (psShot) await writeFile(psShot, (await win.webContents.capturePage()).toPNG());
+    // первый снимок бывает устаревшим кадром — как в --a-shot, снимаем дважды
+    if (psShot) { await win.webContents.capturePage(); await writeFile(psShot, (await win.webContents.capturePage()).toPNG()); }
     console.log("САМОПРОВЕРКА объёма пака:", JSON.stringify(res, null, 1));
     const ok = !res.ошибка && res.нетронуты && (res.журнал as string[]).every((l) => !l.startsWith("✘"));
     console.log("САМОПРОВЕРКА объёма пака, ИТОГ:", ok);
