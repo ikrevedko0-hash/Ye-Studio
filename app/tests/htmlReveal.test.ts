@@ -1,7 +1,7 @@
 // «Живая пикселизация»: HTML-вопрос самодостаточен и не ходит в сеть.
 
 import { describe, expect, it } from "vitest";
-import { buildPixelRevealHtml, REVEAL_DEFAULTS } from "../src/core/siq/htmlReveal";
+import { buildPixelRevealHtml, liveRevealBlocks, REVEAL_DEFAULTS } from "../src/core/siq/htmlReveal";
 
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -27,5 +27,19 @@ describe("buildPixelRevealHtml", () => {
     expect(buildPixelRevealHtml({ image: PNG, title: "<b>Кто?</b>" })).toContain("&lt;b&gt;Кто?&lt;/b&gt;");
     expect(() => buildPixelRevealHtml({ image: "https://example.com/a.png" })).toThrow();
     expect(() => buildPixelRevealHtml({ image: 'data:image/png;base64,AAA");alert(1);("' })).toThrow();
+  });
+});
+
+describe("liveRevealBlocks", () => {
+  it("от крупного к 64, по возрастанию, без повторов", () => {
+    const s = liveRevealBlocks(4);
+    expect(s[0]).toBe(4);
+    expect(s[s.length - 1]).toBe(64);
+    expect(s.every((v, i) => i === 0 || v > s[i - 1])).toBe(true);
+  });
+  it("крупнее 64 — всё равно растёт", () => {
+    const s = liveRevealBlocks(100);
+    expect(s[0]).toBe(100);
+    expect(s[s.length - 1]).toBeGreaterThan(100);
   });
 });

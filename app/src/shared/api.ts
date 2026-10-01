@@ -303,6 +303,8 @@ export interface Api {
   editMedia(req: MediaEditRequest): Promise<MediaInfo>;
   /** Готовая картинка (data:image/…;base64,…) из редактора картинок или коллажа — кладётся в Images */
   saveImage(dataUrl: string, suggestedName: string): Promise<MediaInfo>;
+  /** HTML-вопрос (живая пикселизация и т.п.) — новым файлом в папку Html пака. */
+  saveHtml(html: string, suggestedName: string): Promise<MediaInfo>;
   /** Стоит ли ИИ-увеличение (модель Real-ESRGAN и sd-cli) — «Компоненты». */
   upscaleReady(): Promise<boolean>;
   /** ИИ-увеличение ×2 или ×4 (до 1920 px) — только предпросмотр, в пак не пишет. w, h — исходный размер. */

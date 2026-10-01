@@ -63,6 +63,7 @@ const api: Api = {
   grabFrame: (folder, name, timeSec) => ipcRenderer.invoke("media:frame", folder, name, timeSec),
   editMedia: (req) => ipcRenderer.invoke("media:edit", req),
   saveImage: (dataUrl, suggestedName) => ipcRenderer.invoke("image:save", dataUrl, suggestedName),
+  saveHtml: (html, suggestedName) => ipcRenderer.invoke("html:save", html, suggestedName),
   upscaleReady: () => ipcRenderer.invoke("image:upscaleReady"),
   upscaleImage: (folder, name, w, h, factor) => ipcRenderer.invoke("image:upscale", folder, name, w, h, factor),
   upscaleKeep: (token, name, factor) => ipcRenderer.invoke("image:upscaleKeep", token, name, factor),
