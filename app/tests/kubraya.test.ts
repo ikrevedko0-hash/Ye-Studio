@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { explain, inflectLike, makeClues, pieceLemmas, sameRoot, splitWord, type KubrayaDeps } from "../src/core/words/kubraya";
-import { POOL, sampleHits, seedFrom } from "../src/core/words/generators/shuffle";
+import { POOL, sampleFresh, sampleHits, seedFrom } from "../src/core/words/generators/shuffle";
 import { MapThesaurus } from "../src/core/words/thesaurus";
 
 const thes = MapThesaurus.parse([
@@ -114,6 +114,30 @@ describe("перемешивание выдачи", () => {
       if (got.has(pool.length - 1)) bottom++;
     }
     expect(top).toBeGreaterThan(bottom * 3);
+  });
+
+  it("«Перемешать» сначала показывает то, чего ещё не было", () => {
+    const first = new Set(sampleHits(pool, 30, 1));
+    const r = sampleFresh(pool, 30, 2, (h) => first.has(h));
+    expect(r.hits.filter((h) => first.has(h))).toEqual([]);
+    expect(r.fresh).toBe(30);
+    expect(r.recycled).toBe(false);
+  });
+
+  it("новых не хватает — добирает виденными, и окно узнаёт, сколько новых", () => {
+    const small = Array.from({ length: 40 }, (_, i) => i);
+    const seen = new Set(small.slice(0, 30));
+    const r = sampleFresh(small, 30, 3, (h) => seen.has(h));
+    expect(r.fresh).toBe(10);
+    expect(r.hits).toHaveLength(30);
+    expect(new Set(r.hits).size).toBe(30);
+    expect(r.hits.slice(0, 10).every((h) => !seen.has(h))).toBe(true);
+  });
+
+  it("всё уже видено — круг заново", () => {
+    const r = sampleFresh(pool, 30, 4, () => true);
+    expect(r.recycled).toBe(true);
+    expect(r.hits).toHaveLength(30);
   });
 
   it("не теряет и не дублирует находки", () => {

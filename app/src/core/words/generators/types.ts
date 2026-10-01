@@ -23,6 +23,9 @@ export interface PuzzleTheme {
   hits: WordHit[];
   /** Подсказка, которую стоит положить в комментарий ведущему. */
   note?: string;
+  /** Только у «Перемешать»: сколько находок автор ещё не видел и пошёл ли круг заново (всё уже видено). */
+  fresh?: number;
+  recycled?: boolean;
 }
 
 export interface GeneratorParam {

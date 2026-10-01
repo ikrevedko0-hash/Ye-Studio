@@ -123,7 +123,8 @@ export const kubrayaGenerator: PuzzleGenerator = {
       hits.push({
         word: a[0].toUpperCase() + a.slice(1),
         question: best.clue,
-        why: `${best.clue} — ${explain(best)}${rest.length ? `. Ещё: ${rest.map((c) => c.clue).join("; ")}` : ""}`,
+        // загадка — отдельно (question), а «почему» — только разбор: окно рисует их разными строками
+        why: `${explain(best)}${rest.length ? `. Ещё: ${rest.map((c) => c.clue).join("; ")}` : ""}`,
         common: !best.parts.some((p) => p.inflected),
         noun: true,
       });

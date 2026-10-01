@@ -521,6 +521,15 @@ label.check.inline input { width: auto; }
 .ws-insert { font-size: 12px; padding: 1px 6px; min-width: 24px; opacity: .45; }
 .ws-hit:hover .ws-insert, .ws-hit.sel .ws-insert { opacity: 1; }
 .ws-hit .muted { font-size: 11px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Строки кубраи: ответ и загадка крупно, разбор ниже целиком — две колонки на широком окне */
+.ws-results.rows { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 6px; }
+.ws-hit.ws-row { align-items: flex-start; padding: 7px 10px; }
+.ws-row input { margin-top: 3px; }
+.ws-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.ws-row-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ws-row-head b { font-size: 14px; }
+.ws-row .ws-puzzle { margin: 0; font-family: inherit; letter-spacing: 0; font-size: 14px; font-weight: 600; }
+.ws-hit .ws-row-why { margin-left: 0; white-space: normal; overflow: visible; font-size: 12px; line-height: 1.35; }
 
 /* панель отбора слов: счётчик и кнопки выделения стоят над списком, чтобы их было видно */
 .ws-pickbar { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }

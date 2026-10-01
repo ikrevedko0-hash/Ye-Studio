@@ -8,8 +8,11 @@
 
 import { seededRandom } from "../scramble";
 
-/** Во сколько раз больше находок просить у генератора, чтобы было из чего выбирать. */
-export const POOL = 3;
+/**
+ * Во сколько раз больше находок просить у генератора, чтобы было из чего выбирать.
+ * Было 3 — и «Перемешать» крутило почти те же слова: у кубраи на весь словарь их ~50.
+ */
+export const POOL = 5;
 
 /** Зерно из строки (install-id): FNV-1a, этого хватает. */
 export function seedFrom(text: string): number {
@@ -31,10 +34,24 @@ export function sampleHits<T>(hits: T[], limit: number, seed: number): T[] {
   // проигрывало всегда. Поэтому зерно сначала перемешиваем, а первые числа выбрасываем.
   const rnd = seededRandom(seedFrom(`sample:${seed}`));
   for (let i = 0; i < 8; i++) rnd();
-  const half = Math.max(1, limit / 2);
+  // вес мягче, чем был (1 + i/(limit/2)): иначе дальняя половина запаса почти не выходила
+  const span = Math.max(1, limit);
   return hits
-    .map((h, i) => ({ h, key: Math.pow(rnd() || 1e-9, 1 + i / half) }))
+    .map((h, i) => ({ h, key: Math.pow(rnd() || 1e-9, 1 + i / span) }))
     .sort((a, b) => b.key - a.key)
     .slice(0, limit)
     .map((x) => x.h);
+}
+
+/**
+ * «Перемешать» должно показывать новое, а не тасовать уже виденное. Сначала берём находки, которых
+ * автор ещё не видел; не хватает — добираем виденными. Всё уже видено — круг заново (recycled).
+ */
+export function sampleFresh<T>(hits: T[], limit: number, seed: number, seen: (h: T) => boolean): { hits: T[]; fresh: number; recycled: boolean } {
+  const fresh = hits.filter((h) => !seen(h));
+  if (!fresh.length) return { hits: sampleHits(hits, limit, seed), fresh: 0, recycled: true };
+  const first = sampleHits(fresh, limit, seed);
+  if (first.length >= limit) return { hits: first, fresh: first.length, recycled: false };
+  const old = sampleHits(hits.filter(seen), limit - first.length, seed + 1);
+  return { hits: [...first, ...old], fresh: first.length, recycled: false };
 }

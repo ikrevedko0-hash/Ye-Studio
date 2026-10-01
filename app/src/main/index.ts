@@ -35,7 +35,7 @@ import type { FeedbackRequest } from "../shared/api";
 import type { DownloadWish, FetchProgress, MediaResult, ProviderConfig, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import { Dictionary } from "../core/words/dict";
 import { generatorById, generatorInfos } from "../core/words/generators/registry";
-import { POOL, sampleHits, seedFrom } from "../core/words/generators/shuffle";
+import { POOL, sampleFresh, sampleHits, seedFrom } from "../core/words/generators/shuffle";
 import { setWordSourceDirs, wordSourceDirs } from "../core/words/sources/registry";
 import { loadPhrases, PHRASE_KINDS, PHRASE_STYLES } from "../core/words/phrases";
 import type { GeneratorArgs } from "../core/words/generators/types";
@@ -1286,11 +1286,15 @@ function registerIpc() {
     if (!g) throw new Error(`неизвестный генератор ${id}`);
     // Находок просим с запасом и берём случайную выборку с перевесом в пользу лучших (shuffle.ts):
     // зерно по умолчанию своё у каждой копии программы, «Перемешать» в окне присылает новое
-    const { shuffle, ...rest } = args;
+    // seen — слова, уже показанные окну с прошлого «Подобрать» (через перевод строки): «Перемешать» берёт сначала новые
+    const { shuffle, seen, ...rest } = args;
     const limit = Number(rest.limit) || 60;
     const t = await g.run(dict(), { ...rest, limit: limit * POOL });
     const seed = typeof shuffle === "number" && shuffle > 0 ? shuffle : seedFrom(await installId());
-    return { ...t, hits: sampleHits(t.hits, limit, seed) };
+    if (!seen) return { ...t, hits: sampleHits(t.hits, limit, seed) };
+    const was = new Set(String(seen).split("\n"));
+    const r = sampleFresh(t.hits, limit, seed, (h) => was.has(h.word));
+    return { ...t, hits: r.hits, fresh: r.fresh, recycled: r.recycled };
   });
 
   // ---------- студия слов: генерация картинок ----------
