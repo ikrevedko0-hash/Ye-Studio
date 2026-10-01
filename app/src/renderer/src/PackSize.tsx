@@ -35,6 +35,14 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
   const [busy, setBusy] = useState("");
   const [log, setLog] = useState<string[]>([]);
   const [compressing, setCompressing] = useState<MediaInfo | null>(null);
+  /** Картинки, с которых сняли галочку: по умолчанию ужимаются все. */
+  const [skipped, setSkipped] = useState<Set<string>>(new Set());
+  const picked = bigImages.filter((m) => !skipped.has(m.name));
+  const togglePick = (name: string) => setSkipped((s) => {
+    const n = new Set(s);
+    if (!n.delete(name)) n.add(name);
+    return n;
+  });
   const say = (s: string) => setLog((l) => [...l, s]);
 
   /** Старый файл — копией в source/ и из пака вон (окно узнаёт через media-removed). */
@@ -64,7 +72,7 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
   };
 
   const shrinkImages = async () => {
-    const list = [...bigImages];
+    const list = [...picked];
     let before = 0, after = 0, done = 0;
     for (const [i, m] of list.entries()) {
       setBusy(`Ужимаю картинки: ${i + 1} из ${list.length} — ${m.name}`);
@@ -141,10 +149,23 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
           <h4>Картинки тяжелее {fmt(IMAGE_MIN_BYTES)} — {bigImages.length} ({fmt(bigImages.reduce((s, m) => s + m.size, 0))})</h4>
           {bigImages.length > 0 && (
             <>
-              <div className="ps-list">{bigImages.slice(0, 50).map((m) => <div key={m.name}><span>{m.name}</span><b>{fmt(m.size)}</b></div>)}</div>
-              <button className="primary" disabled={!!busy} onClick={shrinkImages}
+              <div className="ps-list">
+                <label className="ps-all">
+                  <input type="checkbox" disabled={!!busy} checked={picked.length === bigImages.length}
+                    ref={(el) => { if (el) el.indeterminate = picked.length > 0 && picked.length < bigImages.length; }}
+                    onChange={() => setSkipped(picked.length ? new Set(bigImages.map((m) => m.name)) : new Set())} />
+                  <span>Отмечено {picked.length} из {bigImages.length} ({fmt(picked.reduce((s, m) => s + m.size, 0))})</span>
+                </label>
+                {bigImages.map((m) => (
+                  <label key={m.name}>
+                    <input type="checkbox" disabled={!!busy} checked={!skipped.has(m.name)} onChange={() => togglePick(m.name)} />
+                    <span>{m.name}</span><b>{fmt(m.size)}</b>
+                  </label>
+                ))}
+              </div>
+              <button className="primary" disabled={!!busy || !picked.length} onClick={shrinkImages}
                 title={`До ${IMAGE_MAX_SIDE} px по большей стороне, JPEG ${IMAGE_QUALITY * 100} % (с прозрачностью — PNG). Меняем, только если стало легче на 10 % и больше`}>
-                Ужать все: {IMAGE_MAX_SIDE} px, JPEG {IMAGE_QUALITY * 100} %
+                {picked.length === bigImages.length ? "Ужать все" : `Ужать отмеченные (${picked.length})`}: {IMAGE_MAX_SIDE} px, JPEG {IMAGE_QUALITY * 100} %
               </button>
             </>
           )}
