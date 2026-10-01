@@ -98,6 +98,7 @@ const api: Api = {
   wordGenerators: () => ipcRenderer.invoke("words:generators"),
   wordStats: () => ipcRenderer.invoke("words:stats"),
   wordRun: (id, args) => ipcRenderer.invoke("words:run", id, args),
+  rebusSuggest: (answer, opts) => ipcRenderer.invoke("rebus:suggest", answer, opts),
   imagePresets: () => ipcRenderer.invoke("imagegen:presets"),
   phrases: () => ipcRenderer.invoke("phrases:get"),
   imagePresetPut: (p) => ipcRenderer.invoke("imagegen:putPreset", p),

@@ -1071,3 +1071,45 @@ button:has(> .ico), header > b:has(> .ico) { display: inline-flex; align-items: 
 .sr-shots figcaption { color: var(--muted); font-size: 11px; }
 .sr-zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, .8); display: flex; align-items: center; justify-content: center; cursor: zoom-out; z-index: 100; }
 .sr-zoom img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }
+
+/* ---------- студия: ребусы ---------- */
+.rb-body .ws-side { gap: 8px; }
+.rb-answer { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.rb-answer input { font-family: var(--font-display); font-size: 16px; letter-spacing: .04em; text-transform: uppercase; }
+.rb-found { display: flex; flex-direction: column; gap: 4px; overflow: auto; min-height: 0; }
+.rb-main { overflow: auto; }
+.rb-stage { position: relative; flex: 1; min-height: 220px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; padding: 8px; }
+.rb-stage canvas { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
+.rb-empty { position: absolute; font-size: 12px; }
+.rb-reads { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.rb-reads b { font-family: var(--font-display); letter-spacing: .04em; }
+.rb-ok { color: var(--ready); }
+.rb-bad { color: var(--danger); }
+.rb-explain { font-size: 12px; }
+.rb-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rb-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 6px; padding: 2px; background: var(--bg); }
+.rb-chip.sel { border-color: var(--gold); }
+.rb-chip button { border: none; background: transparent; }
+.rb-chip button.small { font-size: 12px; padding: 0 5px; min-width: 0; }
+.rb-chip-main { font-size: 13px; padding: 2px 8px; }
+.rb-add { display: inline-flex; gap: 4px; margin-left: auto; }
+.rb-add button.small { font-size: 12px; padding: 2px 8px; }
+.rb-look { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted); }
+.rb-look label:not(.ig-style) { display: flex; align-items: center; gap: 6px; }
+.rb-look input[type="range"] { width: 110px; }
+.rb-props { width: 300px; border-left: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow: auto; font-size: 12px; }
+.rb-group { display: flex; flex-direction: column; gap: 7px; }
+.rb-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rb-row > .muted:first-child { width: 78px; flex-shrink: 0; }
+.rb-row input:not([type]) , .rb-row select { flex: 1; min-width: 0; }
+.rb-row input.rb-letter { flex: 0 0 44px; text-align: center; text-transform: uppercase; }
+.rb-step { display: inline-flex; align-items: center; gap: 4px; }
+.rb-step + .rb-step { margin-left: 84px; }
+.rb-row > .rb-step:first-of-type { min-width: 0; }
+.rb-step b { min-width: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.rb-step button.small { padding: 0 7px; font-size: 12px; }
+.rb-check { align-self: flex-start; }
+.rb-pic { display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--line); padding-top: 8px; }
+.rb-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.rb-thumbs button { padding: 0; aspect-ratio: 1; overflow: hidden; background: var(--bg); }
+.rb-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }

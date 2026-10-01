@@ -14,6 +14,7 @@ import type { WorkHit } from "../core/ai/works";
 import type { QuotaInfo } from "../core/ai/quota";
 import type { ImageModelInfo } from "../core/ai/image";
 import type { PhraseSet } from "../core/words/phrases";
+import type { Suggestion, SuggestOptions } from "../core/rebus/suggest";
 import type { ProfileId, SystemReport } from "../core/system/probe";
 import type { ComponentsState, InstallProgress } from "../core/components/manifest";
 import type { SigameProgress } from "../core/sigame/run";
@@ -357,6 +358,8 @@ export interface Api {
   wordGenerators(): Promise<GeneratorInfo[]>;
   wordStats(): Promise<DictStats[]>;
   wordRun(id: string, args: GeneratorArgs): Promise<PuzzleTheme>;
+  /** Ребусы: варианты разбора ответа по словарю существительных (core/rebus/suggest.ts). */
+  rebusSuggest(answer: string, opts?: SuggestOptions): Promise<Suggestion[]>;
   // ---------- генерация картинок ----------
   imagePresets(): Promise<ImagePreset[]>;
   /** Словарь фразеологизмов и пословиц (скачан заранее, из сети не читается). */

@@ -35,6 +35,7 @@ import type { FeedbackRequest } from "../shared/api";
 import type { DownloadWish, FetchProgress, MediaResult, ProviderConfig, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import { Dictionary } from "../core/words/dict";
 import { generatorById, generatorInfos } from "../core/words/generators/registry";
+import { suggest as rebusSuggest, type SuggestOptions } from "../core/rebus/suggest";
 import { POOL, sampleFresh, sampleHits, seedFrom } from "../core/words/generators/shuffle";
 import { setWordSourceDirs, wordSourceDirs } from "../core/words/sources/registry";
 import { loadPhrases, PHRASE_KINDS, PHRASE_STYLES } from "../core/words/phrases";
@@ -1297,6 +1298,13 @@ function registerIpc() {
     return { ...t, hits: r.hits, fresh: r.fresh, recycled: r.recycled };
   });
 
+  // Ребусы: список существительных держим в памяти после первого вызова — подбор зовут на каждое слово
+  ipcMain.handle("rebus:suggest", async (_e, answer: string, opts?: SuggestOptions) => {
+    const d = dict();
+    const [nouns, fame] = await Promise.all([d.words("nouns"), d.fame()]);
+    return rebusSuggest(answer, { nouns, fame }, opts);
+  });
+
   // ---------- студия слов: генерация картинок ----------
   // Ключи — в providers.json (см. core/ai/config.ts). Картинку окно кладёт в пак само,
   // через тот же image:save, что и редактор картинок: второй путь записи в пак не нужен.
@@ -1756,7 +1764,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("rebus-test") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -3072,6 +3080,76 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
     if (!result?.ok) process.exitCode = 1;
   }
 
+  // Студия → «Ребусы»: ответ → «Подобрать разбор» → первый вариант → снимок (--rebus-shot=<png>).
+  const rbAnswer = arg("rebus-test");
+  if (data && rbAnswer) {
+    const result = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      let open = null;
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
+      open.click();
+      let tab = null;
+      for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Ребусы"); }
+      if (!tab) return { ok: false, why: "нет вкладки «Ребусы»" };
+      tab.click();
+      await wait(200);
+      const field = document.querySelector(".rb-answer input");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(field, ${JSON.stringify(rbAnswer)});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await wait(80);
+      const t0 = performance.now();
+      byText(".rb-body .ws-side button", "Подобрать")?.click();
+      let found = [];
+      for (let i = 0; i < 200 && !found.length; i++) { await wait(100); found = [...document.querySelectorAll(".rb-found .ws-gen")]; }
+      const сек = Math.round(performance.now() - t0) / 1000;
+      if (!found.length) return { ok: false, why: document.querySelector(".mc-note")?.textContent ?? "пусто" };
+      const pickN = ${Number(arg("rebus-pick")) || 0};
+      (found[pickN] ?? found[0]).click();
+      await wait(400);
+      // --rebus-search=1: каждой картинке — первая находка поиска (нужна сеть)
+      const searched = [];
+      if (${JSON.stringify(arg("rebus-search") === "1")}) {
+        const chips = [...document.querySelectorAll(".rb-chip-main")];
+        for (const chip of chips) {
+          chip.click();
+          await wait(150);
+          const parts = [...document.querySelectorAll(".rb-props .ws-tabs button")].filter((b) => /^[ab]:/.test(b.textContent));
+          for (const part of parts.length ? parts : [null]) {
+            part?.click();
+            await wait(120);
+            const go = byText(".rb-pic button", "Найти");
+            if (!go) continue;
+            go.click();
+            let th = null;
+            for (let i = 0; i < 300 && !th; i++) { await wait(100); th = document.querySelector(".rb-thumbs button"); }
+            if (!th) { searched.push("не нашлось: " + (document.querySelector(".mc-note")?.textContent ?? "")); continue; }
+            th.click();
+            for (let i = 0; i < 300; i++) { await wait(100); if (!/Качаю/.test(document.querySelector(".mc-note")?.textContent ?? "")) break; }
+            searched.push(chip.textContent + ": " + (document.querySelector(".mc-note")?.textContent || "ок"));
+          }
+        }
+        await wait(800);
+      }
+      const reads = document.querySelector(".rb-reads")?.textContent ?? "";
+      const cv = document.querySelector(".rb-stage canvas");
+      return {
+        ok: /сходится/.test(reads), сек, варианты: found.map((b) => b.querySelector("b")?.textContent),
+        читается: reads, куски: [...document.querySelectorAll(".rb-chip-main")].map((b) => b.textContent),
+        холст: cv ? cv.width + "x" + cv.height : "нет", картинки: searched,
+      };
+    })()`);
+    const rbShot = arg("rebus-shot");
+    if (rbShot) {
+      await win.webContents.capturePage();
+      await writeFile(rbShot, (await win.webContents.capturePage()).toPNG());
+    }
+    console.log("rebus-test:", JSON.stringify(result, null, 1));
+    if (!result?.ok) process.exitCode = 1;
+  }
+
   // Студия → «Голос»: фраза → перевод (облако/локально) → при --voice-speak=1 озвучка → при --voice-insert=1 в вопрос.
   const vsPhrase = arg("voice-studio");
   if (data && vsPhrase) {
@@ -3751,7 +3829,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("rebus-test") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;
