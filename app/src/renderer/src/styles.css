@@ -636,6 +636,7 @@ button.link.inline { padding: 0; }
 .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .ai-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .ai-grid label.wide { grid-column: 1 / -1; }
+.ai-grid .ai-launch-title { grid-column: 1 / -1; font-size: 12px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ai-grid textarea { font-family: Consolas, monospace; font-size: 12px; }
 .ai-grid label.ai-check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
 .ai-grid label.ai-check input { width: auto; }

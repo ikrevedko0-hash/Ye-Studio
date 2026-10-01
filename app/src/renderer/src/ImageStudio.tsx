@@ -81,12 +81,32 @@ function cleanError(e: unknown): string {
   return String((e as Error).message).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
 }
 
+/** «lmstudio:qwen/…: fetch failed» → «lmstudio: не запущен» — коротко и по-русски, для подсказки. */
+function skipReason(raw: string): string {
+  const i = raw.indexOf(": ");
+  const who = (i > 0 ? raw.slice(0, i) : raw).replace(/:.*$/, "");
+  const why = i > 0 ? raw.slice(i + 2) : "";
+  const short =
+    /fetch failed|ECONNREFUSED|не запустился/i.test(why) ? "не запущен"
+    : /429|quota|daily free allocation|лимит/i.test(why) ? "лимит исчерпан"
+    : /цензур/i.test(why) ? "отказалась (цензура)"
+    : /пауз/i.test(why) ? "на паузе после сбоя"
+    : /timeout|aborted/i.test(why) ? "не ответил вовремя"
+    : why.split("\n")[0].slice(0, 80);
+  return `${who}: ${short}`;
+}
+
 export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props) {
   const [presets, setPresets] = useState<ImagePreset[]>([]);
   const [preset, setPreset] = useState("literal");
   const [phrase, setPhrase] = useState("");
   const [prompt, setPrompt] = useState("");
   const [promptBy, setPromptBy] = useState("");
+  /**
+   * Кто из очереди выбыл до того, как сцену придумали: «почему отвечает не первая модель?» —
+   * LM Studio не запущен, у Gemini кончился лимит, GPT-OSS отказался… Видно по наведению.
+   */
+  const [promptSkipped, setPromptSkipped] = useState<string[]>([]);
   /** Какое произведение узнала модель — чтобы промах был виден до рисования. */
   const [work, setWork] = useState("");
   /** Подсказки Wikidata к названию («фильм по детскому рисунку») и выбранное из них произведение. */
@@ -230,6 +250,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
       const r = await window.api.imagePrompt(phrase, preset, temperature, suggests && chosen ? chosen : undefined);
       setPrompt(r.text);
       setPromptBy(r.model);
+      setPromptSkipped(r.skipped ?? []);
       setWork(r.work ?? "");
       return r.text;
     } catch (e) {
@@ -467,6 +488,11 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
         <label className="ig-prompt">
           <span>
             Сцена для рисования {promptBy && <span className="muted">— придумала {shortModel(promptBy)}</span>}
+            {promptBy && promptSkipped.length > 0 && (
+              <span className="muted ig-skipped" title={promptSkipped.map(skipReason).join("\n")}>
+                · до неё пропущены: {promptSkipped.length}
+              </span>
+            )}
             {work && <span className="muted" title="Не тот фильм? Допишите уточнение в скобках: «Солнцестояние (2019)» или «(Midsommar)» — и «Другая сцена»">· узнала: <b>{work}</b></span>}
             {fromPhrase && (
               <button className="small" onClick={() => void makePrompt()} disabled={!!busy || !phrase.trim()} title="Попросить модель описать сцену заново">

@@ -22,6 +22,14 @@ export interface ProviderEdit {
   note?: string;
   disabled?: boolean;
   paid?: boolean;
+  /** Модель без цензуры: в выборе модели «Картинок» помечается «без цензуры». */
+  uncensored?: boolean;
+  /** Дописать в начало промпта картинки (теги качества Pony и т. п.). */
+  promptPrefix?: string;
+  /** Свой сервер, который приложение запускает само: программа, рабочая папка, аргументы по одному. */
+  launchExe?: string;
+  launchCwd?: string;
+  launchArgs?: string[];
   hasKey: boolean;
   /** «…a1b2» */
   keyHint: string;
@@ -71,7 +79,10 @@ export const PROVIDER_TEMPLATES: ProviderTemplate[] = [
   { id: "lmstudio", title: "LM Studio (локально)", kind: "openai", base: "http://127.0.0.1:1234/v1",
     models: [], imageModels: [], note: "бесплатно, без лимитов, медленно" },
   { id: "sdcpp", title: "Своя видеокарта (sd-server)", kind: "openai", base: "http://127.0.0.1:7861/v1",
-    models: [], imageModels: ["sd-cpp-local"], note: "бесплатно, без лимитов, ~15 с на картинку; автозапуск — поле launch в providers.json" },
+    models: [], imageModels: ["sd-cpp-local"], note: "бесплатно, без лимитов, ~15 с на картинку; автозапуск — раздел «Запуск своего сервера»" },
+  { id: "local-model", title: "Своя модель (свой сервер)", kind: "openai", base: "http://127.0.0.1:7871/v1",
+    models: [], imageModels: ["sd-cpp-local"],
+    note: "sd-server или llama-server на своей видеокарте: укажите программу, папку и аргументы в «Запуске своего сервера»; у каждой модели свой порт" },
   { id: "custom", title: "Свой OpenAI-совместимый", kind: "openai", base: "https://",
     models: [], imageModels: [], note: "" },
 ];
@@ -98,6 +109,11 @@ export async function readSettings(baseDir: string): Promise<AiSettings> {
       note: p.note,
       disabled: p.disabled,
       paid: p.paid,
+      uncensored: p.uncensored,
+      promptPrefix: p.promptPrefix,
+      launchExe: p.launch?.exe,
+      launchCwd: p.launch?.cwd,
+      launchArgs: p.launch?.args,
       hasKey: !!p.key,
       keyHint: hint(p.key),
     })),
@@ -148,11 +164,19 @@ export async function writeSettings(baseDir: string, s: AiSettings): Promise<AiS
     p.imageModels = e.imageModels.map((m) => m.trim()).filter(Boolean);
     if (e.extraBody.trim()) p.extraBody = JSON.parse(e.extraBody);
     else delete p.extraBody;
-    for (const k of ["timeoutSec", "note", "disabled", "paid"] as const) {
+    for (const k of ["timeoutSec", "note", "disabled", "paid", "uncensored"] as const) {
       const v = e[k];
       if (v === undefined || v === "" || v === false || v === 0) delete p[k];
       else (p as unknown as Record<string, unknown>)[k] = v;
     }
+    // начало промпта: пробелы на краях значимы («score_9, …, » клеится к сцене), поэтому не обрезаем
+    if (e.promptPrefix?.trim()) p.promptPrefix = e.promptPrefix;
+    else delete p.promptPrefix;
+    // запуск своего сервера: пустая программа — запуска нет, сервер автор поднимает сам
+    if (e.launchExe?.trim()) {
+      const args = (e.launchArgs ?? []).map((a) => a.trim()).filter(Boolean);
+      p.launch = { exe: e.launchExe.trim(), ...(e.launchCwd?.trim() ? { cwd: e.launchCwd.trim() } : {}), ...(args.length ? { args } : {}) };
+    } else delete p.launch;
     providers[e.id] = p;
   }
   // из очередей убираем то, что ссылается на удалённые сервисы
