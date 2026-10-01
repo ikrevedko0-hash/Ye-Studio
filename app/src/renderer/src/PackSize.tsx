@@ -154,10 +154,11 @@ export function PackSize({ pack, mutate, onClose }: { pack: PackDTO; mutate: Mut
                   <input type="checkbox" disabled={!!busy} checked={picked.length === bigImages.length}
                     ref={(el) => { if (el) el.indeterminate = picked.length > 0 && picked.length < bigImages.length; }}
                     onChange={() => setSkipped(picked.length ? new Set(bigImages.map((m) => m.name)) : new Set())} />
-                  <span>Отмечено {picked.length} из {bigImages.length} ({fmt(picked.reduce((s, m) => s + m.size, 0))})</span>
+                  <span>Все картинки</span>
+                  <b>отмечено {picked.length} из {bigImages.length} · {fmt(picked.reduce((s, m) => s + m.size, 0))}</b>
                 </label>
                 {bigImages.map((m) => (
-                  <label key={m.name}>
+                  <label key={m.name} className={skipped.has(m.name) ? "off" : ""}>
                     <input type="checkbox" disabled={!!busy} checked={!skipped.has(m.name)} onChange={() => togglePick(m.name)} />
                     <span>{m.name}</span><b>{fmt(m.size)}</b>
                   </label>

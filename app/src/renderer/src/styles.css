@@ -873,9 +873,15 @@ label.secs input:disabled { opacity: .5; }
 .ps-tips { margin: 0; padding-left: 18px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
 .ps-list { max-height: 170px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
 .ps-list > div, .ps-list > label { display: flex; align-items: center; gap: 10px; padding: 3px 8px; font-size: 12px; border-bottom: 1px solid var(--line); }
-.ps-list > label { cursor: pointer; }
-.ps-list > label input { margin: 0; }
-.ps-list > .ps-all { position: sticky; top: 0; background: var(--panel-2); font-weight: 600; }
+/* общее правило label — столбиком; здесь строка: галочка · имя · размер */
+.ps-list > label { flex-direction: row; margin: 0; color: var(--text); cursor: pointer; }
+.ps-list > label:hover { background: var(--wash); }
+.ps-list > label input { width: auto; flex: none; margin: 0; accent-color: var(--accent); }
+.ps-list > label.off { color: var(--muted); }
+.ps-list > label.off b { font-weight: 400; }
+.ps-list > .ps-all { position: sticky; top: 0; z-index: 1; background: var(--panel-2); font-weight: 600; }
+.ps-list > .ps-all b { font-weight: 400; color: var(--muted); }
+.ps-list span .ico { display: inline-block; vertical-align: -2px; margin-right: 4px; }
 .ps-list > div span, .ps-list > label span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ps-log { font-size: 12px; display: flex; flex-direction: column; gap: 2px; }
 
