@@ -2,10 +2,11 @@
 
 import { anagramGenerator } from "./anagram";
 import { initialsGenerator } from "./initials";
+import { kubrayaGenerator } from "./kubraya";
 import { matrixGenerator } from "./matrix";
 import type { PuzzleGenerator } from "./types";
 
-const ALL: PuzzleGenerator[] = [matrixGenerator, anagramGenerator, initialsGenerator];
+const ALL: PuzzleGenerator[] = [matrixGenerator, anagramGenerator, initialsGenerator, kubrayaGenerator];
 
 export function registerGenerator(g: PuzzleGenerator): void {
   const i = ALL.findIndex((x) => x.id === g.id);

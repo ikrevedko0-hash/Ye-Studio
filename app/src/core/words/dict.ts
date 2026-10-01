@@ -45,7 +45,7 @@ export class Dictionary {
   /** Наборы слов по длине: нужны там, где проверка «это слово?» идёт тысячами. */
   private byLength = new Map<string, Set<string>>();
 
-  constructor(private dir: string) {}
+  constructor(readonly dir: string) {}
 
   /**
    * Насколько слово на слуху: 0 — незнакомое, 1 — самое частое в языке.
