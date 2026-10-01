@@ -1692,6 +1692,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --silhouette-test=<чувствит.> [--silhouette-shot=<png>]  силуэт первой картинки вопроса: только чёрное и белое, применить;
  *   --logo-test=<папка>              «Номер на логотип»: кадр каждого стиля, цифра на манжету, поставить логотипом;
  *   --pack-size=1 [--save-copy=<siq>]  «📦 Объём пака»: убрать неиспользуемое, ужать картинки, печатает до/после;
+ *     [--pack-size-skip=N]             снять галочки с N первых картинок: они должны остаться нетронутыми;
  *   --library-test=1                 открыть библиотеку мастерской, проверить предпросмотр и «в пак»;
  *                                     открыть медиацентр, найти по-настоящему, при --media-get=1 скачать первое в пак;
  *   --word-studio=<кусок> [--word-create=1]
@@ -2146,7 +2147,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const until = async (f, ms = 8000) => { for (let t = 0; t < ms; t += 50) { const v = f(); if (v) return v; await wait(50); } return null; };
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
-      const chip = await until(() => byText(".chip-btn", "МБ"), 20000);
+      const chip = await until(() => byText(".pack-size-btn", "МБ"), 20000);
       if (!chip) return { ошибка: "нет кнопки объёма в шапке" };
       const before = chip.textContent;
       chip.click();
@@ -2154,7 +2155,11 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const heads = () => [...document.querySelectorAll(".pack-size h4")].map((h) => h.textContent);
       const tips = [...document.querySelectorAll(".pack-size .ps-tips li")].map((l) => l.textContent);
       const headsBefore = heads();
-      for (const label of ["Убрать из пака", "Ужать все"]) {
+      const imgRows = () => [...document.querySelectorAll(".pack-size .ps-list > label:not(.ps-all)")];
+      const skipped = imgRows().slice(0, ${Number(arg("pack-size-skip") ?? 0)}).map((l) => { l.querySelector("input").click(); return l.querySelector("span").textContent; });
+      await wait(100);
+      const shrinkLabel = byText(".pack-size button", "Ужать")?.textContent ?? "";
+      for (const label of ["Убрать из пака", "Ужать"]) {
         const b = byText(".pack-size button", label);
         if (!b) continue;
         b.click();
@@ -2162,11 +2167,13 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         await until(() => !document.querySelector(".pack-size footer .muted"), 600000);
       }
       await wait(500);
-      return { до: before, после: byText(".chip-btn", "МБ").textContent, разделыДо: headsBefore, разделыПосле: heads(), советы: tips,
+      const left = imgRows().map((l) => l.querySelector("span").textContent);
+      return { до: before, после: byText(".pack-size-btn", "МБ").textContent, разделыДо: headsBefore, разделыПосле: heads(), советы: tips,
+        кнопка: shrinkLabel, сняты: skipped, нетронуты: skipped.filter((n) => left.includes(n)).length === skipped.length,
         журнал: [...document.querySelectorAll(".pack-size .ps-log div")].map((d) => d.textContent) };
     })()`);
     console.log("САМОПРОВЕРКА объёма пака:", JSON.stringify(res, null, 1));
-    const ok = !res.ошибка && (res.журнал as string[]).every((l) => !l.startsWith("✘"));
+    const ok = !res.ошибка && res.нетронуты && (res.журнал as string[]).every((l) => !l.startsWith("✘"));
     console.log("САМОПРОВЕРКА объёма пака, ИТОГ:", ok);
     if (!ok) process.exitCode = 1;
   }
