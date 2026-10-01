@@ -3089,6 +3089,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       let open = null;
       for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
+      // localStorage общий с живой Мастерской автора: его черновик ребуса вернём на место в конце
+      window.__rebusDraft = localStorage.getItem("rebusStudio.draft");
       open.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Ребусы"); }
@@ -3109,6 +3111,36 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const pickN = ${Number(arg("rebus-pick")) || 0};
       (found[pickN] ?? found[0]).click();
       await wait(400);
+      // выбор варианта сам выделяет кусок без картинки и сам ищет ему картинку
+      const selChip = () => document.querySelector(".rb-chip.sel .rb-chip-main")?.textContent ?? "";
+      const автоВыбор = selChip();
+      let автоПоиск = 0;
+      for (let i = 0; i < 300 && !автоПоиск; i++) { await wait(100); автоПоиск = document.querySelectorAll(".rb-thumbs button").length; }
+      // щелчок по холсту справа — выделяет другой кусок
+      let щелчок = "";
+      const cvs = document.querySelector(".rb-stage canvas");
+      if (cvs && document.querySelectorAll(".rb-chip").length > 1) {
+        const r = cvs.getBoundingClientRect();
+        cvs.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: r.left + r.width * 0.8, clientY: r.top + r.height * 0.5 }));
+        await wait(300);
+        щелчок = selChip();
+      }
+      // файл, брошенный на первый квадрат, ложится в первый кусок
+      let бросок = "";
+      if (cvs) {
+        const pic = document.createElement("canvas");
+        pic.width = pic.height = 64;
+        const g = pic.getContext("2d");
+        g.fillStyle = "#c03030"; g.fillRect(8, 8, 48, 48);
+        const blob = await new Promise((res) => pic.toBlob(res, "image/png"));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], "проба.png", { type: "image/png" }));
+        const r = cvs.getBoundingClientRect();
+        cvs.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + r.width * 0.25, clientY: r.top + r.height * 0.5 }));
+        await wait(600);
+        const draft = JSON.parse(localStorage.getItem("rebusStudio.draft") ?? "{}");
+        бросок = (draft.pieces ?? []).map((x) => x.word + ":" + (x.image?.url ? "картинка" : "пусто")).join(", ");
+      }
       // --rebus-search=1: каждой картинке — первая находка поиска (нужна сеть)
       const searched = [];
       if (${JSON.stringify(arg("rebus-search") === "1")}) {
@@ -3138,7 +3170,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       return {
         ok: /сходится/.test(reads), сек, варианты: found.map((b) => b.querySelector("b")?.textContent),
         читается: reads, куски: [...document.querySelectorAll(".rb-chip-main")].map((b) => b.textContent),
-        холст: cv ? cv.width + "x" + cv.height : "нет", картинки: searched,
+        холст: cv ? cv.width + "x" + cv.height : "нет", картинки: searched, автоВыбор, автоПоиск, щелчок, бросок,
       };
     })()`);
     const rbShot = arg("rebus-shot");
@@ -3146,6 +3178,13 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       await win.webContents.capturePage();
       await writeFile(rbShot, (await win.webContents.capturePage()).toPNG());
     }
+    // окно пишет черновик при каждой правке — закрываем студию и только потом возвращаем черновик автора
+    await win.webContents.executeJavaScript(`(async () => {
+      [...document.querySelectorAll(".word-studio header button")].find((b) => b.textContent.includes("Закрыть"))?.click();
+      await new Promise((r) => setTimeout(r, 200));
+      if (window.__rebusDraft == null) localStorage.removeItem("rebusStudio.draft");
+      else localStorage.setItem("rebusStudio.draft", window.__rebusDraft);
+    })()`);
     console.log("rebus-test:", JSON.stringify(result, null, 1));
     if (!result?.ok) process.exitCode = 1;
   }

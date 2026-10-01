@@ -12,7 +12,7 @@ import {
 } from "../../core/rebus/model";
 import { TECHNIQUES, label, type Suggestion, type Technique } from "../../core/rebus/suggest";
 import { applyScale, exportCanvas, loadImage, loadPackImage, toCanvas } from "./imageCanvas";
-import { cutout, drawRebus, DEFAULT_STYLE, type DrawStyle } from "./rebusDraw";
+import { cutout, drawRebus, layoutRebus, DEFAULT_STYLE, type DrawStyle, type PieceBox } from "./rebusDraw";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -94,6 +94,10 @@ export function RebusStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   const [fontsReady, setFontsReady] = useState(false);
   const [style, setStyle] = useState<DrawStyle>(DEFAULT_STYLE);
   const view = useRef<HTMLCanvasElement>(null);
+  /** Где на холсте какой кусок — для щелчков и перетаскивания файла. */
+  const boxes = useRef<PieceBox[]>([]);
+  /** Попросить панель справа сразу искать картинку для куска id (n — чтобы повторный запрос сработал). */
+  const [searchTick, setSearchTick] = useState<{ id: string; n: number } | null>(null);
   const cutCache = useRef(new Map<string, HTMLCanvasElement>());
 
   useEffect(() => { void document.fonts.ready.then(() => setFontsReady(true)); }, []);
@@ -129,12 +133,24 @@ export function RebusStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   useEffect(() => {
     const c = view.current;
     if (!c) return;
-    const art = drawRebus(rebus, picOf, style);
+    const { canvas: art, boxes: at } = layoutRebus(rebus, picOf, style);
+    boxes.current = at;
     c.width = art.width;
     c.height = art.height;
-    c.getContext("2d")!.drawImage(art, 0, 0);
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(art, 0, 0);
+    // выбранный кусок обводим только на экране: в PNG рамки нет, её рисуем поверх копии
+    const box = at.find((b) => b.id === sel);
+    if (box) {
+      const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#8b5cf6";
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.roundRect(box.x - 8, box.y - 8, box.w + 16, box.h + 16, 12);
+      ctx.stroke();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rebus, pics, fontsReady, style]);
+  }, [rebus, pics, fontsReady, style, sel]);
 
   const reads = readRebus(rebus);
   const ok = matches(rebus);
@@ -193,15 +209,60 @@ export function RebusStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
     }
   };
 
+  /** Какую часть куска править: у предлога — ту, где картинки ещё нет (иначе «что»). */
+  const partFor = (p: RebusPiece): "a" | "b" =>
+    p.kind === "relation" && !(p.a.kind === "picture" && !p.a.image) && p.b.kind === "picture" && !p.b.image ? "b" : "a";
+  const needsPicture = (p: RebusPiece) => simples([p]).some((x) => x.kind === "picture" && !x.image);
+
+  /** Выделить кусок; search — сразу искать ему картинку (результаты появятся справа). */
+  const focusPiece = (p: RebusPiece, search: boolean) => {
+    const prt = partFor(p);
+    setSel(p.id);
+    setPart(prt);
+    const target = p.kind === "relation" ? p[prt] : p;
+    if (search && target.kind === "picture" && target.word.trim()) setSearchTick({ id: target.id, n: Date.now() });
+  };
+
   /** Вариант разбора → ребус. Картинки уже выбранных слов не теряем. */
   const take = (s: Suggestion) => {
     const had = new Map(simples(rebus.pieces).filter((p) => p.image).map((p) => [fold(p.word), p.image!]));
     const keep = (p: SimplePiece): SimplePiece => (p.kind === "picture" && had.has(fold(p.word)) ? { ...p, image: had.get(fold(p.word)) } : p);
     const pieces = s.rebus.pieces.map((p) => (p.kind === "relation" ? { ...p, a: keep(p.a), b: keep(p.b) } : keep(p)));
     setRebus({ answer: rebus.answer, pieces });
-    const first = pieces[0];
-    setSel(first?.id ?? null);
-    setPart("a");
+    // сразу к делу: первый кусок без картинки выделен, и для него уже идёт поиск
+    const first = pieces.find(needsPicture) ?? pieces[0];
+    if (first) focusPiece(first, needsPicture(first));
+    else setSel(null);
+  };
+
+  /** Кусок под точкой мыши (координаты экрана → холста: холст на экране сжат). */
+  const hit = (e: { clientX: number; clientY: number }): RebusPiece | undefined => {
+    const c = view.current;
+    if (!c) return undefined;
+    const r = c.getBoundingClientRect();
+    const x = ((e.clientX - r.left) * c.width) / r.width;
+    const y = ((e.clientY - r.top) * c.height) / r.height;
+    const box = boxes.current.find((b) => x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h);
+    return box && rebus.pieces.find((p) => p.id === box.id);
+  };
+
+  /** Файл картинки, брошенный на кусок, — сразу в этот кусок. */
+  const dropFile = (e: React.DragEvent) => {
+    e.preventDefault();
+    const piece = hit(e);
+    const file = [...e.dataTransfer.files].find((f) => f.type.startsWith("image/"));
+    if (!piece || !file) { if (file) setNote("Бросьте картинку прямо на квадрат куска."); return; }
+    const prt = partFor(piece);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = String(reader.result);
+      const put = (x: SimplePiece): SimplePiece => (x.kind === "picture" ? { ...x, image: { ...x.image, url, name: undefined } } : x);
+      patchPieces((ps) => ps.map((p) => (p.id !== piece.id ? p : p.kind === "relation" ? { ...p, [prt]: put(p[prt]) } : put(p))));
+      setSel(piece.id);
+      setPart(prt);
+      setNote("");
+    };
+    reader.readAsDataURL(file);
   };
 
   const render = (): string | null => {
@@ -275,7 +336,16 @@ export function RebusStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
 
       <div className="ws-main rb-main">
         <div className="rb-stage">
-          <canvas ref={view} aria-label={`Ребус: ${rebus.answer}`} />
+          <canvas
+            ref={view}
+            aria-label={`Ребус: ${rebus.answer}`}
+            title="Щелчок — выбрать кусок (пустой — сразу искать картинку), двойной — искать картинку, файл можно бросить на квадрат"
+            onClick={(e) => { const p = hit(e); if (p) focusPiece(p, needsPicture(p)); }}
+            onDoubleClick={(e) => { const p = hit(e); if (p) focusPiece(p, true); }}
+            onMouseMove={(e) => { e.currentTarget.style.cursor = hit(e) ? "pointer" : "default"; }}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
+            onDrop={dropFile}
+          />
           {!rebus.pieces.length && <span className="muted rb-empty">Подберите разбор слева или добавьте куски кнопками ниже</span>}
         </div>
         <div className="rb-reads">
@@ -342,13 +412,14 @@ export function RebusStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
       </div>
 
       <div className="rb-props">
-        {!selected && <span className="muted">Выберите кусок в ряду под ребусом — здесь его слово, запятые, знаки и картинка.</span>}
+        {!selected && <div className="rb-hint">Щёлкните по куску на холсте (или в ряду под ним) — здесь появятся его слово, запятые, знаки и поиск картинки.</div>}
         {selected?.kind === "relation" && (
           <RelationEditor rel={selected} part={part} onPart={setPart} onChange={(r) => replace(selected.id, r)} />
         )}
         {editing && (
           <SimpleEditor
             key={editing.id}
+            searchTick={searchTick}
             piece={editing}
             onChange={editSimple}
             busy={busy}
@@ -395,9 +466,10 @@ interface SimpleProps {
   setNote(n: string): void;
   onOpenAi?(): void;
   nested?: boolean;
+  searchTick?: { id: string; n: number } | null;
 }
 
-function SimpleEditor({ piece: p, onChange, busy, setBusy, setNote, onOpenAi, nested }: SimpleProps) {
+function SimpleEditor({ piece: p, onChange, busy, setBusy, setNote, onOpenAi, nested, searchTick }: SimpleProps) {
   const commas = getOp(p, "commas") ?? { kind: "commas" as const, left: 0, right: 0 };
   const swap = getOp(p, "swap");
   const drop = getOp(p, "drop");
@@ -513,27 +585,34 @@ function SimpleEditor({ piece: p, onChange, busy, setBusy, setNote, onOpenAi, ne
       )}
 
       {p.kind === "picture" && (
-        <PicturePicker piece={p} onChange={onChange} busy={busy} setBusy={setBusy} setNote={setNote} onOpenAi={onOpenAi} />
+        <PicturePicker piece={p} onChange={onChange} busy={busy} setBusy={setBusy} setNote={setNote} onOpenAi={onOpenAi} searchTick={searchTick} />
       )}
     </div>
   );
 }
 
-function PicturePicker({ piece: p, onChange, busy, setBusy, setNote, onOpenAi }: Omit<SimpleProps, "nested">) {
+function PicturePicker({ piece: p, onChange, busy, setBusy, setNote, onOpenAi, searchTick }: Omit<SimpleProps, "nested">) {
   const [src, setSrc] = useState<"search" | "ai" | "file">("search");
   const [query, setQuery] = useState(p.word);
   const [results, setResults] = useState<MediaResult[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => setQuery(p.word), [p.word]);
+  // окно попросило искать для этого куска (щелчок по пустому квадрату, выбор разбора)
+  useEffect(() => {
+    if (searchTick?.id !== p.id) return;
+    setSrc("search");
+    void search(p.word);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTick?.n]);
 
   const setImage = (url: string) => onChange({ ...p, image: { ...p.image, url, name: undefined } });
 
-  const search = async () => {
-    if (!query.trim()) return;
+  const search = async (text = query) => {
+    if (!text.trim()) return;
     setBusy("search");
     setNote("");
     try {
-      const hit = await window.api.mediaSearch({ text: query.trim(), type: "image", perPage: 24 });
+      const hit = await window.api.mediaSearch({ text: text.trim(), type: "image", perPage: 24 });
       setResults(hit.results);
       if (!hit.results.length) setNote(hit.errors.length ? "Источники не ответили." : "Ничего не нашлось — попробуйте другое слово.");
     } catch (e) {

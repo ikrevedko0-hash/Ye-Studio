@@ -81,11 +81,15 @@ function body(p: SimplePiece, pic: PictureOf, H: number, ink: string): HTMLCanva
       ctx.setLineDash([10, 8]);
       ctx.lineWidth = 3;
       ctx.strokeRect(4, 4, H - 8, H - 8);
-      ctx.fillStyle = "#9a9a9a";
-      ctx.font = font(H * 0.14, 500);
+      // в готовую картинку заглушка не попадает (экспорт без картинок запрещён) — это подсказка окна
+      ctx.fillStyle = "#8a8a8a";
+      ctx.font = font(H * 0.14, 700);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(p.word || "картинка", H / 2, H / 2, H - 20);
+      ctx.fillText(p.word || "картинка", H / 2, H * 0.42, H - 20);
+      ctx.font = font(H * 0.065, 500);
+      ctx.fillText("щёлкните, чтобы", H / 2, H * 0.58, H - 20);
+      ctx.fillText("найти картинку", H / 2, H * 0.66, H - 20);
       return c;
     }
     const { w, h } = fit(img, H * 1.35, H);
@@ -328,8 +332,21 @@ function pieceCanvas(p: RebusPiece, pic: PictureOf, s: DrawStyle): HTMLCanvasEle
   return simpleCanvas(p, pic, s.height, s.ink);
 }
 
+/** Где на холсте стоит кусок: окно по этим рамкам понимает, по какому куску щёлкнули. */
+export interface PieceBox {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 /** Весь ребус одной картинкой. Пустой — пустой лист нужного размера, чтобы окно не прыгало. */
 export function drawRebus(r: Rebus, pic: PictureOf, s: DrawStyle = DEFAULT_STYLE): HTMLCanvasElement {
+  return layoutRebus(r, pic, s).canvas;
+}
+
+export function layoutRebus(r: Rebus, pic: PictureOf, s: DrawStyle = DEFAULT_STYLE): { canvas: HTMLCanvasElement; boxes: PieceBox[] } {
   const parts = r.pieces.map((p) => pieceCanvas(p, pic, s));
   const H = s.height * 1.3;
   const w = s.pad * 2 + parts.reduce((sum, c) => sum + c.width, 0) + Math.max(0, parts.length - 1) * s.gap;
@@ -339,10 +356,13 @@ export function drawRebus(r: Rebus, pic: PictureOf, s: DrawStyle = DEFAULT_STYLE
     ctx.fillStyle = s.paper;
     ctx.fillRect(0, 0, c.width, c.height);
   }
+  const boxes: PieceBox[] = [];
   let x = (c.width - (w - s.pad * 2)) / 2;
-  for (const part of parts) {
-    ctx.drawImage(part, x, s.pad + (H - part.height) / 2);
+  parts.forEach((part, i) => {
+    const y = s.pad + (H - part.height) / 2;
+    ctx.drawImage(part, x, y);
+    boxes.push({ id: r.pieces[i].id, x, y, w: part.width, h: part.height });
     x += part.width + s.gap;
-  }
-  return c;
+  });
+  return { canvas: c, boxes };
 }
