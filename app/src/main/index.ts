@@ -1693,6 +1693,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --logo-test=<папка>              «Номер на логотип»: кадр каждого стиля, цифра на манжету, поставить логотипом;
  *   --pack-size=1 [--save-copy=<siq>]  «📦 Объём пака»: убрать неиспользуемое, ужать картинки, печатает до/после;
  *     [--pack-size-skip=N]             снять галочки с N первых картинок: они должны остаться нетронутыми;
+ *     [--pack-size-shot=<png>]         только снимок окна с галочками, без ужатия;
  *   --library-test=1                 открыть библиотеку мастерской, проверить предпросмотр и «в пак»;
  *                                     открыть медиацентр, найти по-настоящему, при --media-get=1 скачать первое в пак;
  *   --word-studio=<кусок> [--word-create=1]
@@ -2159,6 +2160,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const skipped = imgRows().slice(0, ${Number(arg("pack-size-skip") ?? 0)}).map((l) => { l.querySelector("input").click(); return l.querySelector("span").textContent; });
       await wait(100);
       const shrinkLabel = byText(".pack-size button", "Ужать")?.textContent ?? "";
+      if (${JSON.stringify(!!arg("pack-size-shot"))}) return { кнопка: shrinkLabel, сняты: skipped, нетронуты: true, журнал: [] };
       for (const label of ["Убрать из пака", "Ужать"]) {
         const b = byText(".pack-size button", label);
         if (!b) continue;
@@ -2172,6 +2174,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         кнопка: shrinkLabel, сняты: skipped, нетронуты: skipped.filter((n) => left.includes(n)).length === skipped.length,
         журнал: [...document.querySelectorAll(".pack-size .ps-log div")].map((d) => d.textContent) };
     })()`);
+    const psShot = arg("pack-size-shot");
+    if (psShot) await writeFile(psShot, (await win.webContents.capturePage()).toPNG());
     console.log("САМОПРОВЕРКА объёма пака:", JSON.stringify(res, null, 1));
     const ok = !res.ошибка && res.нетронуты && (res.журнал as string[]).every((l) => !l.startsWith("✘"));
     console.log("САМОПРОВЕРКА объёма пака, ИТОГ:", ok);
