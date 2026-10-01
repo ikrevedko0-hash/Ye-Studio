@@ -4,15 +4,19 @@
 // вместе с их настройками и рисует форму по описанию. Новый генератор появится здесь сам,
 // без единой правки в этом файле.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GeneratorArgs, GeneratorInfo, MediaInfo, PuzzleTheme, WordHit } from "../../shared/api";
 import { ImageStudio } from "./ImageStudio";
+import { RebusStudio } from "./RebusStudio";
+import { VoiceStudio } from "./VoiceStudio";
+import type { PlacementOptions } from "../../core/tts/placement";
 import { Icon } from "./Icon";
 
 interface Props {
   onClose(): void;
   /** Создать тему в текущем раунде из отмеченных слов. */
-  onCreateTheme(title: string, hits: WordHit[]): void;
+  /** themeComment — правила для игроков в комментарий темы (кубрая); у прочих генераторов нет. */
+  onCreateTheme(title: string, hits: WordHit[], themeComment?: string): void;
   /** Вставить одну находку в открытый вопрос. Нет выбранного вопроса — нет и кнопки. */
   onInsert?(hit: WordHit): void;
   /** Что сейчас выбрано на табло — показываем в подсказке к кнопке. */
@@ -25,6 +29,10 @@ interface Props {
   onImageAdded(img: MediaInfo): void;
   /** Открыть настройки ИИ поверх студии. */
   onOpenAi?(): void;
+  /** Озвучка и перевод — в открытый вопрос по галочкам. */
+  onInsertVoice?(media: MediaInfo | undefined, opts: PlacementOptions, data: { translated: string; original: string }): void;
+  /** Открыть «Компоненты» (поставить голоса). */
+  onOpenComponents?(): void;
 }
 
 /** Значения по умолчанию из описания генератора. */
@@ -34,9 +42,9 @@ function defaults(g: GeneratorInfo): GeneratorArgs {
   return a;
 }
 
-export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, themeSize, onInsertImage, onImageAdded, onOpenAi }: Props) {
+export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, themeSize, onInsertImage, onImageAdded, onOpenAi, onInsertVoice, onOpenComponents }: Props) {
   // Вкладку не запоминаем нарочно: самопроверка --word-studio ждёт, что окно откроется на словах.
-  const [tab, setTab] = useState<"words" | "images">("words");
+  const [tab, setTab] = useState<"words" | "images" | "rebus" | "voice">("words");
   const [gens, setGens] = useState<GeneratorInfo[]>([]);
   const [current, setCurrent] = useState<GeneratorInfo | null>(null);
   const [args, setArgs] = useState<GeneratorArgs>({});
@@ -54,7 +62,11 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
     void window.api.wordStats().then(setDicts);
   }, []);
 
+  /** Слова, показанные с прошлого «Подобрать»: «Перемешать» просит сначала другие. */
+  const shown = useRef(new Set<string>());
+
   const pickGen = (g: GeneratorInfo) => {
+    shown.current = new Set();
     setCurrent(g);
     setArgs(defaults(g));
     setTheme(null);
@@ -62,17 +74,28 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
     setNote("");
   };
 
-  const run = async () => {
+  /**
+   * shuffle — новое зерно выборки: без него у этой копии программы выдача стабильная (зерно — install-id).
+   * При «Перемешать» окно отдаёт уже показанные слова, и выборка берёт сначала новые: раньше она
+   * тасовала почти те же самые, только в другом порядке.
+   */
+  const run = async (shuffle?: number) => {
     if (!current) return;
     setBusy(true);
     setNote("");
     try {
-      const t = await window.api.wordRun(current.id, args);
+      const seen = shuffle ? [...shown.current].join("\n") : "";
+      const t = await window.api.wordRun(current.id, shuffle ? { ...args, shuffle, ...(seen ? { seen } : {}) } : args);
       setTheme(t);
+      // «Подобрать» начинает счёт заново; «Перемешать» копит, пока всё не будет показано
+      if (!shuffle || t.recycled) shown.current = new Set();
+      for (const h of t.hits) shown.current.add(h.word);
       // Отмечаем ровно столько, сколько вопросов встанет в тему: обычно семь. Раньше
       // отмечалось всё подряд, и автор снимал галочки с полусотни слов вручную.
       setPicked(new Set(t.hits.slice(0, themeSize || t.hits.length).map((h) => h.word)));
       if (!t.hits.length) setNote("Ничего не нашлось. Смягчите длину или возьмите словарь побольше.");
+      else if (shuffle && t.recycled) setNote("Всё найденное уже показано — пошёл новый круг. Для других слов смягчите длину или словарь.");
+      else if (shuffle && t.fresh !== undefined && t.fresh < t.hits.length) setNote(`Новых: ${t.fresh} из ${t.hits.length} — остальное уже было, найденное почти закончилось.`);
     } catch (e) {
       setNote(`Не получилось: ${String((e as Error).message).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "")}`);
     } finally {
@@ -81,6 +104,8 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
   };
 
   const all = theme?.hits ?? [];
+  /** У находок своя загадка (кубрая) — показываем строками во всю ширину, а не плитками. */
+  const rows = all.some((h) => !!h.question && h.question !== h.why);
   const pickAll = () => setPicked(new Set(all.map((h) => h.word)));
   const pickNone = () => setPicked(new Set());
   const pickFirst = () => setPicked(new Set(all.slice(0, themeSize ?? 7).map((h) => h.word)));
@@ -103,6 +128,8 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
           <span className="ws-tabs">
             <button className={tab === "words" ? "sel" : ""} onClick={() => setTab("words")}><Icon name="text" />Слова</button>
             <button className={tab === "images" ? "sel" : ""} onClick={() => setTab("images")}><Icon name="palette" />Картинки</button>
+            <button className={tab === "rebus" ? "sel" : ""} onClick={() => setTab("rebus")}><Icon name="puzzle" />Ребусы</button>
+            <button className={tab === "voice" ? "sel" : ""} onClick={() => setTab("voice")}><Icon name="audio" />Голос</button>
           </span>
           {tab === "words" && (
             <span className="muted">
@@ -113,7 +140,11 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
           <button onClick={onClose} disabled={busy}>Закрыть</button>
         </header>
 
-        {tab === "images" ? (
+        {tab === "voice" ? (
+          <VoiceStudio onInsert={onInsertVoice} insertTarget={insertTarget} onAdded={onImageAdded} onOpenAi={onOpenAi} onOpenComponents={onOpenComponents} />
+        ) : tab === "rebus" ? (
+          <RebusStudio onInsert={onInsertImage} insertTarget={insertTarget} onAdded={onImageAdded} onOpenAi={onOpenAi} />
+        ) : tab === "images" ? (
           <ImageStudio onInsert={onInsertImage} insertTarget={insertTarget} onAdded={onImageAdded} onOpenAi={onOpenAi} />
         ) : (<>
         {noDict && (
@@ -156,6 +187,14 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
                   </label>
                 ))}
                 <button className="primary ws-run" onClick={() => void run()} disabled={busy}>{busy ? "Считаю…" : "Подобрать"}</button>
+                <button
+                  className="ws-run"
+                  onClick={() => void run(1 + Math.floor(Math.random() * 0x7ffffffe))}
+                  disabled={busy}
+                  title="Другая выборка из находок: известные слова выходят чаще, но не всегда одни и те же"
+                >
+                  <Icon name="shuffle" />Перемешать
+                </button>
               </div>
             )}
 
@@ -182,8 +221,31 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
               </div>
             )}
 
-            <div className="ws-results">
-              {(theme?.hits ?? []).map((h) => (
+            <div className={`ws-results${rows ? " rows" : ""}`}>
+              {rows && (theme?.hits ?? []).map((h) => (
+                // Загадка и разбор длинные: в узкой плитке «Хранилище пасть — БАНК + РОТ: …» обрезалось на полуслове.
+                // Поэтому строка во всю ширину: ответ и загадка крупно, разбор целиком ниже.
+                <label key={h.word} className={`ws-hit ws-row${picked.has(h.word) ? " sel" : ""}`}>
+                  <input type="checkbox" checked={picked.has(h.word)} onChange={() => toggle(h.word)} />
+                  <span className="ws-row-main">
+                    <span className="ws-row-head">
+                      <b>{h.word}</b>
+                      <span className="ws-puzzle">{h.question}</span>
+                    </span>
+                    <span className="muted ws-row-why">{h.why}</span>
+                  </span>
+                  {onInsert && (
+                    <button
+                      className="small ws-insert"
+                      title={`Вставить в вопрос${insertTarget ? `: ${insertTarget}` : ""} — загадка в текст, слово в ответ. Выбор сам перейдёт к следующему вопросу темы`}
+                      onClick={(e) => { e.preventDefault(); onInsert(h); setNote(`«${h.word}» вставлено в вопрос`); }}
+                    >
+                      →
+                    </button>
+                  )}
+                </label>
+              ))}
+              {!rows && (theme?.hits ?? []).map((h) => (
                 <label key={h.word} className={`ws-hit${picked.has(h.word) ? " sel" : ""}`}>
                   <input type="checkbox" checked={picked.has(h.word)} onChange={() => toggle(h.word)} />
                   <b>{h.word}</b>
@@ -221,7 +283,7 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
             className="primary"
             disabled={!chosen.length}
             title="Создаст тему в текущем раунде: по вопросу на каждое отмеченное слово, ответ уже подставлен"
-            onClick={() => { onCreateTheme(theme?.title ?? "Тема из слов", chosen); onClose(); }}
+            onClick={() => { onCreateTheme(theme?.title ?? "Тема из слов", chosen, theme?.themeComment); onClose(); }}
           >
             Создать тему из отмеченных
           </button>

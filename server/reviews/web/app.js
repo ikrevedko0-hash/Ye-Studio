@@ -140,6 +140,17 @@ const TIP = `<svg class="tip" viewBox="0 0 400 90" preserveAspectRatio="none" ar
     </svg>`;
 
 // ---------- главная ----------
+// Живые отзывы игроков на главной, как цитаты критиков на обложке книги: n случайных из /api/review/quotes.
+async function blurbs(n) {
+  const box = $("#blurbs");
+  let list = [];
+  try { list = (await api("/api/review/quotes")).quotes || []; } catch (e) { return; }
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  box.innerHTML = list.slice(0, n).map(q => `<figure class="blurb"><blockquote>«${esc(q.text)}»</blockquote>
+    <figcaption>— ${q.nick ? esc(q.nick) : "Аноним"}, ${fmt(q.depth)} м · ${esc(q.pack)}</figcaption></figure>`).join("");
+  box.hidden = !list.length;
+}
+
 async function home() {
   document.title = "Айсберг Уе!паков";
   const app = $("#app");
@@ -147,9 +158,11 @@ async function home() {
     <div class="sky-top"><div class="sun"></div></div>
     <h1>Айсберг Уе!паков</h1>
     <p class="sub">${esc(joke("home_sub"))}</p>
+    <div class="blurbs" id="blurbs" hidden></div>
     <p class="hint">Отвечай на что хочешь: до дна нырять не обязательно, каждый ответ сохраняется сразу.</p>
     ${TIP}</div>
     <div class="packs" id="packs"><div class="pk">Грузим паки…</div></div></div>`;
+  blurbs(2);
   try {
     const { packs } = await api("/api/review/packs");
     $("#packs").innerHTML = packs.map((p, i) => `<a class="pk ${i === 0 ? "new" : ""}" href="/${esc(p.slug)}">

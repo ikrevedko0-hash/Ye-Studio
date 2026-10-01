@@ -233,6 +233,34 @@ export function AiSettings({ onClose }: Props) {
                       <input type="checkbox" checked={!!cur.disabled} onChange={(e) => patch(cur.id, { disabled: e.target.checked })} />
                       Выключен — пропускать в очередях
                     </label>
+                    <label className="ai-check">
+                      <input type="checkbox" checked={!!cur.uncensored} onChange={(e) => patch(cur.id, { uncensored: e.target.checked })} />
+                      Без цензуры — так и подписать в выборе модели картинки
+                    </label>
+                    <label className="wide">Начало промпта картинки (необязательно)
+                      <input value={cur.promptPrefix ?? ""} placeholder="например score_9, score_8_up, score_7_up, — для моделей Pony"
+                        onChange={(e) => patch(cur.id, { promptPrefix: e.target.value })} />
+                    </label>
+                    {/* Свой сервер на видеокарте: приложение поднимает его при первом запросе и гасит через полчаса простоя */}
+                    <div className="wide ai-launch-title">
+                      <b>Запуск своего сервера</b>
+                      <span className="muted"> — необязательно. Заполните, и приложение само запустит sd-server или llama-server при первом
+                        запросе и выключит через полчаса простоя. Пусто — сервер вы запускаете сами.</span>
+                    </div>
+                    <label className="wide">Программа сервера
+                      <input value={cur.launchExe ?? ""} placeholder="C:\…\sd-server.exe"
+                        onChange={(e) => patch(cur.id, { launchExe: e.target.value })} />
+                    </label>
+                    <label className="wide">Рабочая папка (откуда считать пути к моделям)
+                      <input value={cur.launchCwd ?? ""} placeholder="C:\…\models"
+                        onChange={(e) => patch(cur.id, { launchCwd: e.target.value })} />
+                    </label>
+                    <label className="wide" title="sd.cpp не открывает пути с русскими буквами — пишите пути к моделям относительно рабочей папки. Порт в аргументах должен совпадать с адресом сервиса">
+                      Аргументы (по одному в строке; порт — как в адресе выше)
+                      <textarea rows={6} value={field(`${cur.id}.launchArgs`, cur.launchArgs ?? [])}
+                        placeholder={"--diffusion-model\ncheckpoints/model.gguf\n--listen-port\n7871"}
+                        onChange={(e) => { setDraft({ ...draft, [`${cur.id}.launchArgs`]: e.target.value }); patch(cur.id, { launchArgs: lines(e.target.value) }); }} />
+                    </label>
                   </div>
                   <div className="ig-actions">
                     <button onClick={() => void test()} disabled={busy} title="Короткий запрос к первой текстовой модели (или список моделей). Картинку не рисует — лимит не тратится">

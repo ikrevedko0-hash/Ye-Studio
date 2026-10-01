@@ -1,4 +1,4 @@
-// Словарь выражений во вкладке «Картинки»: выбрать фразу вместо того, чтобы вспоминать и печатать.
+// Словарь выражений в студии («Картинки», «Голос»): выбрать фразу вместо того, чтобы вспоминать и печатать.
 //
 // Весь словарь (~5 тыс. строк) приходит в окно один раз и фильтруется здесь же: так поиск
 // откликается на каждую букву без походов в главный процесс.
@@ -13,6 +13,7 @@ interface Props {
   used: Set<string>;
 }
 
+/** Сколько фраз показывать сразу; остальное — по кнопке «показать все» (весь словарь ~5 тыс. строк окно тянет). */
 const LIMIT = 300;
 
 export function PhrasePicker({ onPick, used }: Props) {
@@ -23,6 +24,7 @@ export function PhrasePicker({ onPick, used }: Props) {
   const [topic, setTopic] = useState("");
   const [hideUsed, setHideUsed] = useState(true);
   const [maxWords, setMaxWords] = useState(0);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => { void window.api.phrases().then(setDict); }, []);
 
@@ -78,13 +80,18 @@ export function PhrasePicker({ onPick, used }: Props) {
         ))}
         <label className="pp-used"><input type="checkbox" checked={hideUsed} onChange={(e) => setHideUsed(e.target.checked)} /> скрыть уже вставленные</label>
         <span className="spacer" />
-        <span className="muted">{found.length > LIMIT ? `${found.length}, показаны первые ${LIMIT}` : found.length}</span>
+        <span className="muted">{found.length}</span>
+        {found.length > LIMIT && (
+          <button className="small" onClick={() => setShowAll(!showAll)}>
+            {showAll ? `только первые ${LIMIT}` : "показать все"}
+          </button>
+        )}
       </div>
       <div className="pp-list">
-        {found.slice(0, LIMIT).map((p) => (
+        {(showAll ? found : found.slice(0, LIMIT)).map((p) => (
           <button key={p.text} className={`pp-item${used.has(p.text) ? " used" : ""}`} onClick={() => onPick(p.text)} title={[...p.styles.map(styleTitle), ...p.topics].join(" · ")}>
+            {/* пометки стиля не пишем: их выбрали галочками выше, а целиком они во всплывающей подсказке */}
             {used.has(p.text) && "✓ "}{p.text}
-            {p.styles.length > 0 && <span className="muted"> · {p.styles.map(styleTitle).join(", ")}</span>}
           </button>
         ))}
         {!found.length && <span className="muted">Ничего не нашлось — ослабьте фильтры.</span>}

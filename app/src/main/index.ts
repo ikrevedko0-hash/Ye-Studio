@@ -20,29 +20,35 @@ import { prepareQuietSelfTest, SELF_TEST, showQuietly } from "./quietWindow";
 import { enableEditMenu } from "./editMenu";
 import { upscaleImage, upscalerReady } from "./upscale";
 import { backupBeforeOverwrite, clearDraft, readDraft, writeDraft } from "./safety";
+import { packDate, QUALITY_MARKER } from "../core/siq/quality";
+import { setPackAttr } from "../core/siq/board";
 import { findSigame, launchSigame } from "./sigame";
 import { cancelSigameRun, exportSigameRun, runFile, runSigameInApp, sigameInstalled } from "./sigameRun";
 import { cleanupCode, initUpdater } from "./updater";
 import { appVersion, boot } from "./version"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
 // ---------- связь с сервером автора: выключение по ID, отчёты об ошибках, обратная связь ----------
-import { captureFeedbackShot, initRemote, packDupCheck, queueError, sendFeedback } from "./remote";
+import { captureFeedbackShot, initRemote, installId, packDupCheck, queueError, sendFeedback } from "./remote";
 import { crc32 } from "node:zlib";
 import { dupQuestions, toReport } from "../core/siq/dupCheck";
 import type { FeedbackRequest } from "../shared/api";
 import type { DownloadWish, FetchProgress, MediaResult, ProviderConfig, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import { Dictionary } from "../core/words/dict";
 import { generatorById, generatorInfos } from "../core/words/generators/registry";
+import { suggest as rebusSuggest, type SuggestOptions } from "../core/rebus/suggest";
+import { POOL, sampleFresh, sampleHits, seedFrom } from "../core/words/generators/shuffle";
 import { setWordSourceDirs, wordSourceDirs } from "../core/words/sources/registry";
 import { loadPhrases, PHRASE_KINDS, PHRASE_STYLES } from "../core/words/phrases";
 import type { GeneratorArgs } from "../core/words/generators/types";
 import { findAiConfig, loadAiConfig } from "../core/ai/config";
-import { generateImage, NeedPaidError } from "../core/ai/image";
+import { generateImage, imageModelInfos, NeedPaidError } from "../core/ai/image";
 import { IMAGE_STYLES, styleText } from "../core/ai/imageStyles";
 import { deletePreset, phraseToPrompt, presetInfos, putPreset, setPresetsDir, type ImagePreset } from "../core/ai/imagePresets";
 import { searchWorks, workDetails, type WorkDetails, type WorkHit } from "../core/ai/works";
 import { setLaunchBase, stopLocalServers } from "../core/ai/localServer";
 import { componentsDir, setComponentsDirOverride } from "./components";
+import { speak as voiceSpeak, translate as voiceTranslate, voiceState } from "./tts";
+import type { SpeakRequest, VoiceKeepInfo } from "../core/tts/types";
 import { probeSystem } from "./system";
 import { CHATGPT_DIR, findClaudeSkill, setupAssistant } from "./assistantKit";
 import { adoptFolder, installProfile, installTool, loadManifest, removeModel, removeTool, selfUpdateYtdlp, toolInstalled, ytdlpCheckDue, YTDLP_DIR } from "./modelInstall";
@@ -78,11 +84,13 @@ interface Doc {
   path?: string;
   reader?: ZipReader;
   media: Map<string, MediaEntry>;
-  /** Прочие файлы в корне архива (quality.marker и т.п.) — переносим как есть */
+  /** Прочие файлы в корне архива — переносим как есть */
   extras: string[];
+  /** Галочка «контроль качества» SIGame: при записи кладём пустой quality.marker */
+  quality: boolean;
 }
 
-let doc: Doc = { media: new Map(), extras: [] };
+let doc: Doc = { media: new Map(), extras: [], quality: false };
 let win: BrowserWindow | null = null;
 /** Идущая сейчас обработка медиа — чтобы её можно было отменить. */
 let currentJob: AbortController | null = null;
@@ -411,12 +419,12 @@ function mediaInfo(m: MediaEntry): MediaInfo {
 }
 
 function dto(pkg: Package): PackDTO {
-  return { path: doc.path, pkg, media: [...doc.media.values()].map(mediaInfo) };
+  return { path: doc.path, pkg, media: [...doc.media.values()].map(mediaInfo), quality: doc.quality };
 }
 
 function closeDoc() {
   doc.reader?.close();
-  doc = { media: new Map(), extras: [] };
+  doc = { media: new Map(), extras: [], quality: false };
 }
 
 /** Отпечаток файла «crc32:размер» — как в оглавлении zip; по нему база повторов находит тот же файл в чужом паке. */
@@ -447,6 +455,10 @@ async function openPack(path: string): Promise<PackDTO> {
   for (const e of opened.reader.entries) {
     if (e.name === "content.xml") continue;
     const slash = e.name.indexOf("/");
+    if (e.name === QUALITY_MARKER) {
+      doc.quality = true;
+      continue;
+    }
     if (slash < 0) {
       doc.extras.push(e.name);
       continue;
@@ -571,6 +583,8 @@ async function savePack(pkg: Package, saveAs: boolean, forcedTarget?: string): P
 
   // вопросы с вариантами и картинкой: текст — репликой ведущего, иначе SIOnline отдаст кнопкам две трети экрана
   optionsTextToReplic(pkg);
+  // дата в карточке пака SIGame — день последнего сохранения
+  setPackAttr(pkg, "date", packDate());
   const tmp = `${target}.tmp-${Date.now()}`;
   await writeSiq(tmp, pkg, docEntries());
   if (doc.reader && doc.path?.toLowerCase() === target.toLowerCase()) doc.reader.close();
@@ -588,6 +602,8 @@ async function savePack(pkg: Package, saveAs: boolean, forcedTarget?: string): P
 /** Все файлы открытого пака для записи архива: медиа и прочие записи корня. */
 function docEntries(): EntryToWrite[] {
   return [
+    // маркер качества — сразу за content.xml, как у SIQuester
+    ...(doc.quality ? [{ name: QUALITY_MARKER, source: { kind: "buffer" as const, data: Buffer.alloc(0) } }] : []),
     ...[...doc.media.values()].map((m) => ({ name: `${m.folder}/${escapeName(m.name)}`, source: m.source })),
     ...(doc.reader ? doc.extras.map((name) => ({ name, source: { kind: "zip" as const, reader: doc.reader!, name } })) : []),
   ];
@@ -855,6 +871,7 @@ function registerIpc() {
     return addMediaFiles(paths);
   });
 
+  ipcMain.handle("pack:setQuality", (_e, on: boolean) => (doc.quality = !!on));
   ipcMain.handle("media:remove", (_e, folder: string, name: string) => doc.media.delete(key(folder, name)));
 
   /** Байты файла из пака: fetch к siq:// из окна не проходит, а canvas нужен «чистый» источник. */
@@ -1268,7 +1285,24 @@ function registerIpc() {
   ipcMain.handle("words:run", async (_e, id: string, args: GeneratorArgs) => {
     const g = generatorById(id);
     if (!g) throw new Error(`неизвестный генератор ${id}`);
-    return g.run(dict(), args);
+    // Находок просим с запасом и берём случайную выборку с перевесом в пользу лучших (shuffle.ts):
+    // зерно по умолчанию своё у каждой копии программы, «Перемешать» в окне присылает новое
+    // seen — слова, уже показанные окну с прошлого «Подобрать» (через перевод строки): «Перемешать» берёт сначала новые
+    const { shuffle, seen, ...rest } = args;
+    const limit = Number(rest.limit) || 60;
+    const t = await g.run(dict(), { ...rest, limit: limit * POOL });
+    const seed = typeof shuffle === "number" && shuffle > 0 ? shuffle : seedFrom(await installId());
+    if (!seen) return { ...t, hits: sampleHits(t.hits, limit, seed) };
+    const was = new Set(String(seen).split("\n"));
+    const r = sampleFresh(t.hits, limit, seed, (h) => was.has(h.word));
+    return { ...t, hits: r.hits, fresh: r.fresh, recycled: r.recycled };
+  });
+
+  // Ребусы: список существительных держим в памяти после первого вызова — подбор зовут на каждое слово
+  ipcMain.handle("rebus:suggest", async (_e, answer: string, opts?: SuggestOptions) => {
+    const d = dict();
+    const [nouns, fame] = await Promise.all([d.words("nouns"), d.fame()]);
+    return rebusSuggest(answer, { nouns, fame }, opts);
   });
 
   // ---------- студия слов: генерация картинок ----------
@@ -1304,14 +1338,16 @@ function registerIpc() {
     return searchWorks(query, worksAbort.signal);
   });
   ipcMain.handle("imagegen:styles", () => IMAGE_STYLES.map(({ id, title, about }) => ({ id, title, about })));
-  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string, ownStyle?: string) => {
+  // модели для выбора в окне: очередь и свои модели вне очереди (без цензуры)
+  ipcMain.handle("imagegen:models", async () => imageModelInfos((await loadAiConfig(baseDir())).cfg));
+  ipcMain.handle("imagegen:run", async (_e, prompt: string, width: number, height: number, allowPaid = false, style?: string, ownStyle?: string, only?: string) => {
     imagegenAbort = new AbortController();
     const { cfg } = await loadAiConfig(baseDir());
     // стиль — хвостом к сцене: сцена в окне остаётся чистой, а смена стиля не требует новой сцены
     // ownStyle — свой текст стиля пресета (детский рисунок и пресеты автора) вместо галочки
     const full = [prompt.trim(), ownStyle?.trim() || styleText(style)].filter(Boolean).join(" ");
     try {
-      const r = await generateImage(cfg, { prompt: full, width, height }, imagegenAbort.signal, { allowPaid });
+      const r = await generateImage(cfg, { prompt: full, width, height }, imagegenAbort.signal, { allowPaid, only: only || undefined });
       return { dataUrl: `data:${r.mime};base64,${r.data.toString("base64")}`, model: r.model, ms: r.ms, skipped: r.skipped };
     } catch (e) {
       // из главного процесса в окно доходит только текст ошибки — «нужна платная» отдаём ответом
@@ -1350,6 +1386,57 @@ function registerIpc() {
     await addRecord(dir, meta);
     const [media] = await addMediaFiles([full]);
     if (!media) throw new Error("картинка не легла в пак");
+    await linkToPack(dir, file, media.folder, media.name);
+    return media;
+  });
+
+  // ---------- перевод + озвучка (tts.ts) ----------
+  let voiceAbort: AbortController | undefined;
+  ipcMain.handle("voice:state", () => voiceState(baseDir()));
+  ipcMain.handle("voice:translate", async (_e, text: string, target: string, custom: string, allowCloud: boolean) => {
+    voiceAbort = new AbortController();
+    return voiceTranslate(baseDir(), text, target, custom, { allowCloud }, voiceAbort.signal);
+  });
+  ipcMain.handle("voice:speak", async (_e, req: SpeakRequest) => {
+    voiceAbort = new AbortController();
+    const path = await voiceSpeak(baseDir(), req, voiceAbort.signal);
+    return { path, mime: "audio/wav", data: new Uint8Array(await readFile(path)) };
+  });
+  ipcMain.handle("voice:cancel", () => voiceAbort?.abort());
+  /** Озвучку — в библиотеку оригиналом (wav) и в пак копией (mp3; без ffmpeg остаётся wav). */
+  ipcMain.handle("voice:keep", async (_e, wavPath: string, info: VoiceKeepInfo) => {
+    const tmp = join(tmpdir(), "ye-voice");
+    if (resolvePath(dirname(wavPath)).toLowerCase() !== resolvePath(tmp).toLowerCase() || !/\.wav$/i.test(wavPath)) throw new Error("это не озвучка");
+    const dir = currentSourceDir();
+    await mkdir(dir, { recursive: true });
+    const base = ("озвучка - " + info.text).replace(/[\/:*?"<>|\r\n]/g, "_").replace(/\s+/g, " ").replace(/[.\s]+$/g, "").trim().slice(0, 80) || "озвучка";
+    let file = base + ".wav";
+    for (let i = 2; existsSync(join(dir, file)); i++) file = `${base} (${i}).wav`;
+    const full = join(dir, file);
+    await copyFile(wavPath, full);
+    const meta: SourceMeta = {
+      providerId: "ИИ",
+      title: info.text,
+      author: [info.engine === "gpu" ? "Qwen3-TTS" : "Piper", info.lang].join(" · "),
+      license: "озвучено ИИ",
+      fetchedAt: new Date().toISOString(),
+      file,
+      sizeBytes: (await stat(full)).size,
+      prompt: info.original,
+    };
+    await addRecord(dir, meta);
+    let forPack = full;
+    if (ffmpegAvailable()) {
+      const mp3 = full.replace(/\.wav$/i, ".mp3");
+      try {
+        const sec = (await probe(full)).durationSec;
+        // голос из TTS тихий (замер 30.09: в среднем −36 дБ) — к общей громкости пака, как галочка в редакторе медиа
+        await transcode({ input: full, output: mp3, start: 0, end: Math.max(0.1, sec), audio: "only", quality: "normal", normalize: true });
+        forPack = mp3;
+      } catch { /* не вышло — в пак пойдёт wav */ }
+    }
+    const [media] = await addMediaFiles([forPack]);
+    if (!media) throw new Error("озвучка не легла в пак");
     await linkToPack(dir, file, media.folder, media.name);
     return media;
   });
@@ -1612,6 +1699,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: "siq", privileges: { standard: t
  *   --word-studio=<кусок> [--word-create=1]
  *                                     открыть студию слов, подобрать матрицу, при --word-create=1 создать тему;
  *                                     --word-gen=Инициалы --word-args=letter=Х,count=3 — другой генератор и его списки;
+ *   --voice-studio=<фраза> [--voice-target=la] [--voice-speak=1] [--voice-insert=1] [--voice-shot=<png>]
+ *                                     Студия → «Голос»: перевести по-настоящему, озвучить, вставить в выбранный вопрос;
  *   --ai-settings=1 [--ai-select=<сервис>] [--ai-tab=queues]
  *                                     открыть настройки ИИ из шапки, дождаться остатков (для снимка);
  *   --imagegen-test=<фраза> [--imagegen-preset=<название>] [--imagegen-again=1]
@@ -1677,7 +1766,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
   }
   const pack = arg("selftest"), shot = arg("shot"), copy = arg("save-copy"), media = arg("new-with-media");
   // проверки, которые щёлкают по интерфейсу: копию пака после них сохраняем в самом конце
-  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
+  const uiTest = !!(arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("rebus-test") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui"));
   let data: PackDTO | null = null;
   if (media) {
     closeDoc();
@@ -2683,7 +2772,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       open?.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
@@ -2698,7 +2787,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       toggle.click();
       let list = null;
       for (let i = 0; i < 50 && !document.querySelector(".pp-item"); i++) await wait(100);
-      list = document.querySelector(".prp-list");
+      list = document.querySelector(".pp-list");
       const main = document.querySelector(".ig-main");
       return {
         ok: !!list, до: before, после: size(document.querySelector(".ig-stage")), словарь: size(document.querySelector(".pp")),
@@ -2865,7 +2954,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
       open.click();
       let params = null;
@@ -2952,8 +3041,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         const howMany = ${Number(arg("word-insert-times")) || 3};
         // У инициалов и матрицы (генератор по умолчанию) текст вопроса пишет автор: вставка ставит
         // только ответ, и проверять надо, что прежний текст вопроса остался как был.
-        // Загадку в текст кладут только анаграммы.
-        const answerOnly = !/Анаграм/.test(want);
+        // Загадку в текст кладут анаграммы и кубрая; у кубраи в плитке «загадка — разбор», в вопрос идёт загадка.
+        const answerOnly = !/Анаграм|Кубра/.test(want);
         const textsOf = (q) => (q?.params ?? []).flatMap((x) => (x.children ?? []).map((c) => c.item?.value));
         const before = (window.__pack?.rounds?.[0]?.themes?.[0]?.questions ?? []).map((q) => JSON.stringify(textsOf(q)));
         const put = [];
@@ -2970,7 +3059,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         const landed = put.map((p, n) => {
           const q = questions[1 + n];
           const texts = textsOf(q);
-          const текстНаМесте = answerOnly ? JSON.stringify(texts) === before[1 + n] : texts.includes(p.puzzle);
+          const текстНаМесте = answerOnly ? JSON.stringify(texts) === before[1 + n] : texts.includes(String(p.puzzle).split(" — ")[0]);
           return { ждали: p.word, ответ: q?.right?.[0], текстНаМесте, всегоТекстов: texts.filter(Boolean).length };
         });
         return {
@@ -3000,6 +3089,189 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       };
     })()`);
     console.log("САМОПРОВЕРКА студии слов:", JSON.stringify(result, null, 1));
+    if (!result?.ok) process.exitCode = 1;
+  }
+
+  // Студия → «Ребусы»: ответ → «Подобрать разбор» → первый вариант → снимок (--rebus-shot=<png>).
+  const rbAnswer = arg("rebus-test");
+  if (data && rbAnswer) {
+    const result = await win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      let open = null;
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
+      // localStorage общий с живой Мастерской автора: его черновик ребуса вернём на место в конце
+      window.__rebusDraft = localStorage.getItem("rebusStudio.draft");
+      open.click();
+      let tab = null;
+      for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Ребусы"); }
+      if (!tab) return { ok: false, why: "нет вкладки «Ребусы»" };
+      tab.click();
+      await wait(200);
+      const field = document.querySelector(".rb-answer input");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(field, ${JSON.stringify(rbAnswer)});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await wait(80);
+      const t0 = performance.now();
+      byText(".rb-body .ws-side button", "Подобрать")?.click();
+      let found = [];
+      for (let i = 0; i < 200 && !found.length; i++) { await wait(100); found = [...document.querySelectorAll(".rb-found .ws-gen")]; }
+      const сек = Math.round(performance.now() - t0) / 1000;
+      if (!found.length) return { ok: false, why: document.querySelector(".mc-note")?.textContent ?? "пусто" };
+      const pickN = ${Number(arg("rebus-pick")) || 0};
+      (found[pickN] ?? found[0]).click();
+      await wait(400);
+      // выбор варианта сам выделяет кусок без картинки и сам ищет ему картинку
+      const selChip = () => document.querySelector(".rb-chip.sel .rb-chip-main")?.textContent ?? "";
+      const автоВыбор = selChip();
+      let автоПоиск = 0;
+      for (let i = 0; i < 300 && !автоПоиск; i++) { await wait(100); автоПоиск = document.querySelectorAll(".rb-thumbs button").length; }
+      // щелчок по холсту справа — выделяет другой кусок
+      let щелчок = "";
+      const cvs = document.querySelector(".rb-stage canvas");
+      if (cvs && document.querySelectorAll(".rb-chip").length > 1) {
+        const r = cvs.getBoundingClientRect();
+        cvs.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: r.left + r.width * 0.8, clientY: r.top + r.height * 0.5 }));
+        await wait(300);
+        щелчок = selChip();
+      }
+      // файл, брошенный на первый квадрат, ложится в первый кусок
+      let бросок = "";
+      if (cvs) {
+        const pic = document.createElement("canvas");
+        pic.width = pic.height = 64;
+        const g = pic.getContext("2d");
+        g.fillStyle = "#c03030"; g.fillRect(8, 8, 48, 48);
+        const blob = await new Promise((res) => pic.toBlob(res, "image/png"));
+        const dt = new DataTransfer();
+        dt.items.add(new File([blob], "проба.png", { type: "image/png" }));
+        const r = cvs.getBoundingClientRect();
+        cvs.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + r.width * 0.25, clientY: r.top + r.height * 0.5 }));
+        await wait(600);
+        const draft = JSON.parse(localStorage.getItem("rebusStudio.draft") ?? "{}");
+        бросок = (draft.pieces ?? []).map((x) => x.word + ":" + (x.image?.url ? "картинка" : "пусто")).join(", ");
+      }
+      // --rebus-search=1: каждой картинке — первая находка поиска (нужна сеть)
+      const searched = [];
+      if (${JSON.stringify(arg("rebus-search") === "1")}) {
+        const chips = [...document.querySelectorAll(".rb-chip-main")];
+        for (const chip of chips) {
+          chip.click();
+          await wait(150);
+          const parts = [...document.querySelectorAll(".rb-props .ws-tabs button")].filter((b) => /^[ab]:/.test(b.textContent));
+          for (const part of parts.length ? parts : [null]) {
+            part?.click();
+            await wait(120);
+            const go = byText(".rb-pic button", "Найти");
+            if (!go) continue;
+            go.click();
+            let th = null;
+            for (let i = 0; i < 300 && !th; i++) { await wait(100); th = document.querySelector(".rb-thumbs button"); }
+            if (!th) { searched.push("не нашлось: " + (document.querySelector(".mc-note")?.textContent ?? "")); continue; }
+            th.click();
+            for (let i = 0; i < 300; i++) { await wait(100); if (!/Качаю/.test(document.querySelector(".mc-note")?.textContent ?? "")) break; }
+            searched.push(chip.textContent + ": " + (document.querySelector(".mc-note")?.textContent || "ок"));
+          }
+        }
+        await wait(800);
+      }
+      const reads = document.querySelector(".rb-reads")?.textContent ?? "";
+      const cv = document.querySelector(".rb-stage canvas");
+      return {
+        ok: /сходится/.test(reads), сек, варианты: found.map((b) => b.querySelector("b")?.textContent),
+        читается: reads, куски: [...document.querySelectorAll(".rb-chip-main")].map((b) => b.textContent),
+        холст: cv ? cv.width + "x" + cv.height : "нет", картинки: searched, автоВыбор, автоПоиск, щелчок, бросок,
+      };
+    })()`);
+    const rbShot = arg("rebus-shot");
+    if (rbShot) {
+      await win.webContents.capturePage();
+      await writeFile(rbShot, (await win.webContents.capturePage()).toPNG());
+    }
+    // окно пишет черновик при каждой правке — закрываем студию и только потом возвращаем черновик автора
+    await win.webContents.executeJavaScript(`(async () => {
+      [...document.querySelectorAll(".word-studio header button")].find((b) => b.textContent.includes("Закрыть"))?.click();
+      await new Promise((r) => setTimeout(r, 200));
+      if (window.__rebusDraft == null) localStorage.removeItem("rebusStudio.draft");
+      else localStorage.setItem("rebusStudio.draft", window.__rebusDraft);
+    })()`);
+    console.log("rebus-test:", JSON.stringify(result, null, 1));
+    if (!result?.ok) process.exitCode = 1;
+  }
+
+  // Студия → «Голос»: фраза → перевод (облако/локально) → при --voice-speak=1 озвучка → при --voice-insert=1 в вопрос.
+  const vsPhrase = arg("voice-studio");
+  if (data && vsPhrase) {
+    const vsShot = arg("voice-shot");
+    const shotAs = async (name: string) => { if (vsShot) await writeFile(vsShot.replace(/\.png$/i, `-${name}.png`), (await win.webContents.capturePage()).toPNG()); };
+    const step = (code: string) => win.webContents.executeJavaScript(`(async () => {
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
+      ${code}
+    })()`);
+    let result = await step(`
+      let open = null;
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
+      open.click();
+      let tab = null;
+      for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Голос"); }
+      if (!tab) return { ok: false, why: "нет вкладки «Голос»" };
+      tab.click();
+      await wait(300);
+      const target = ${JSON.stringify(arg("voice-target") ?? "")};
+      if (target) { byText(".ws-side .ws-gen", target)?.click(); await wait(100); }
+      const field = document.querySelector(".ig-phrase input");
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(field, ${JSON.stringify(vsPhrase)});
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await wait(80);
+      const t0 = performance.now();
+      byText(".ws-params button", "Перевести")?.click();
+      let vars = [];
+      for (let i = 0; i < 1200; i++) {
+        await wait(100);
+        vars = [...document.querySelectorAll(".vs-variant")].map((b) => b.textContent);
+        if (vars.length || document.querySelector(".mc-note.bad") || document.querySelector(".ig-prompt textarea")?.value) break;
+      }
+      return {
+        ok: !document.querySelector(".mc-note.bad") && !!document.querySelector(".ig-prompt textarea")?.value,
+        перевод: vars, чем: document.querySelector(".vs-variants > .muted")?.textContent, сек: Math.round(performance.now() - t0) / 1000,
+        ошибка: document.querySelector(".mc-note.bad")?.textContent, голос: document.querySelector(".ws-params select")?.selectedOptions?.[0]?.textContent,
+      };
+    `);
+    await shotAs("перевод");
+    if (result?.ok && arg("voice-speak") === "1") {
+      result = { ...result, ...(await step(`
+        const t0 = performance.now();
+        byText(".ws-params button", "Озвучить")?.click();
+        let a = null;
+        for (let i = 0; i < 1900 && !a; i++) { await wait(100); a = document.querySelector(".vs-player audio"); if (document.querySelector(".mc-note.bad")) break; }
+        if (!a) return { ok: false, why: document.querySelector(".mc-note.bad")?.textContent ?? "озвучка не пришла" };
+        for (let i = 0; i < 50 && !(a.duration > 0); i++) await wait(100);
+        return { ok: a.duration > 0, озвучкаСек: Math.round(performance.now() - t0) / 1000, длина: a.duration };
+      `)) };
+      await shotAs("озвучка");
+    }
+    if (result?.ok && arg("voice-insert") === "1") {
+      result = { ...result, ...(await step(`
+        const ins = byText(".ig-actions button", "В вопрос");
+        if (!ins) return { ok: false, why: "нет кнопки «В вопрос» (не выбран вопрос?)" };
+        if (ins.disabled) return { ok: false, why: "кнопка «В вопрос» выключена" };
+        ins.click();
+        // сохранение — копия в библиотеку и mp3 через ffmpeg: ждём ответа окна, а не фиксированную паузу
+        let note = "";
+        for (let i = 0; i < 600; i++) { await wait(100); note = document.querySelector(".mc-note")?.textContent ?? ""; if (/в вопросе|bad/.test(note) || document.querySelector(".mc-note.bad")) break; }
+        await wait(300);
+        const qs = (window.__pack?.rounds ?? []).flatMap((r) => r.themes ?? []).flatMap((t) => t.questions ?? []);
+        const hit = qs.find((q) => (q.params ?? []).some((p) => p.children?.some((c) => c.item?.type === "audio" && /озвучка/i.test(decodeURIComponent(c.item.value)))));
+        if (!hit) return { ok: false, why: "озвучка не легла ни в один вопрос", note: document.querySelector(".mc-note")?.textContent };
+        return { ok: true, вопрос: hit.params.map((p) => p.name + ": " + p.children.map((c) => (c.item?.type ?? "text") + "=" + c.item?.value).join(" | ")), ответ: hit.right };
+      `)) };
+    }
+    console.log("САМОПРОВЕРКА «Голос»:", JSON.stringify(result, null, 1));
     if (!result?.ok) process.exitCode = 1;
   }
 
@@ -3167,8 +3439,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
-      if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
+      if (!open) return { ok: false, why: "нет кнопки студии в шапке" };
       open.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
@@ -3243,7 +3515,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "ИИ"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector("button.k-set") ?? byText(".file-actions button", "ИИ"); }
       if (!open) return { ok: false, why: "нет кнопки «⚙ ИИ» в шапке" };
       open.click();
       let refresh = null;
@@ -3608,7 +3880,7 @@ app.whenReady().then(async () => {
       .catch((e) => { console.error("САМОПРОВЕРКА окна входа упала:", e); process.exitCode = 1; })
       .finally(() => app.quit());
   }
-  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
+  if (arg("first-run") || arg("assistant-setup") || arg("shot") || arg("save-copy") || arg("rename-theme") || arg("ai-settings") || arg("imagegen-test") || arg("works-test") || arg("preset-test") || arg("image-test") || arg("collage-test") || arg("media-center") || arg("word-studio") || arg("rebus-test") || arg("voice-studio") || arg("split") || arg("yt-diagnose") || arg("library-test") || arg("game-preview") || arg("theme-transfer") || arg("theme-clip") || arg("dict-layout") || arg("proposals") || arg("board-test") || arg("point-test") || arg("pixelate-test") || arg("pixelate-theme") || arg("silhouette-test") || arg("logo-test") || arg("pack-size") || arg("sigame-ui") || arg("poster")) void selfTest(win, arg).catch((e) => {
     // иначе окно висит молча и самопроверку приходится убивать руками
     console.error("САМОПРОВЕРКА УПАЛА:", e);
     process.exitCode = 1;

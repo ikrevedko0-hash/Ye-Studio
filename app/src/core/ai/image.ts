@@ -17,6 +17,35 @@ export interface ImageRequest {
 export interface ImageOptions {
   /** Разрешить платные модели (paid у провайдера). Без этого они пропускаются. */
   allowPaid?: boolean;
+  /** Рисовать только этой моделью («провайдер:модель»), а не по очереди: автор выбрал её в окне. */
+  only?: string;
+}
+
+/** Модель для выбора в окне: очередь плюс модели, которых в очереди нет (свои, без цензуры). */
+export interface ImageModelInfo {
+  ref: string;
+  title: string;
+  uncensored: boolean;
+  local: boolean;
+  paid: boolean;
+}
+
+export function imageModelInfos(cfg: AiConfig): ImageModelInfo[] {
+  const chain = cfg.imageChain?.length ? cfg.imageChain : DEFAULT_IMAGE_CHAIN;
+  const refs = [...chain];
+  for (const [id, p] of Object.entries(cfg.providers)) {
+    for (const m of p.imageModels ?? []) if (!refs.includes(`${id}:${m}`)) refs.push(`${id}:${m}`);
+  }
+  const out: ImageModelInfo[] = [];
+  for (const ref of refs) {
+    const [id, model] = splitRef(ref);
+    const p = cfg.providers[id];
+    if (!p || p.disabled) continue;
+    // у своих моделей имя модели одно на всех («sd-cpp-local») — показываем название сервиса
+    const title = p.launch ? (p.title ?? id) : `${p.title ?? id}: ${model.split("/").pop()}`;
+    out.push({ ref, title, uncensored: !!p.uncensored, local: !!p.launch, paid: !!p.paid });
+  }
+  return out;
 }
 
 /**
@@ -117,7 +146,7 @@ async function openaiLike(cfg: AiConfig, provider: string, p: AiProvider, model:
   const r = await fetch(`${p.base.replace(/\/$/, "")}/images/generations`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ model, prompt: local ? withSeed(req.prompt) : req.prompt, n: 1, size, ...(local ? { response_format: "b64_json", output_format: "png" } : {}) }),
+    body: JSON.stringify({ model, prompt: local ? withSeed((p.promptPrefix ?? "") + req.prompt) : (p.promptPrefix ?? "") + req.prompt, n: 1, size, ...(local ? { response_format: "b64_json", output_format: "png" } : {}) }),
     signal,
   });
   noteHeaders(provider, r.headers);
@@ -138,7 +167,9 @@ async function openaiLike(cfg: AiConfig, provider: string, p: AiProvider, model:
  * любая другая — просто переход к следующей. Отмена от окна прерывает всё сразу.
  */
 export async function generateImage(cfg: AiConfig, req: ImageRequest, signal?: AbortSignal, opts: ImageOptions = {}): Promise<ImageResult> {
-  const chain = cfg.imageChain?.length ? cfg.imageChain : DEFAULT_IMAGE_CHAIN;
+  // выбранная автором модель — одна, без очереди; платная по явному выбору считается согласием
+  const chain = opts.only ? [opts.only] : cfg.imageChain?.length ? cfg.imageChain : DEFAULT_IMAGE_CHAIN;
+  if (opts.only) opts = { ...opts, allowPaid: true };
   const skipped: string[] = [];
   const paidLeft: string[] = [];
   for (const ref of chain) {

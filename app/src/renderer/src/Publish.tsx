@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { buildVkPost } from "../../core/siq/publish";
+import { buildPackCard, buildVkPost } from "../../core/siq/publish";
 import { getAttr } from "../../core/siq/model";
 import type { PackDTO } from "../../shared/api";
 import { Icon } from "./Icon";
@@ -14,7 +14,15 @@ export function Publish({ pack, onClose }: Props) {
   const pkg = pack.pkg;
   const packName = getAttr(pkg, "name")?.trim() || "Без названия";
 
+  // «Пост ВК» — анонс в своей группе; «Описание пака» — для FirePacks, темы ВК SIGame и Steam Workshop
+  const [kind, setKind] = useState<"vk" | "card">("vk");
+  const [humor, setHumor] = useState(false);
+  const [steam, setSteam] = useState("");
   const [text, setText] = useState(() => buildVkPost(pkg));
+  const show = (k: "vk" | "card", h = humor, s = steam) => {
+    setKind(k);
+    setText(k === "vk" ? buildVkPost(pkg) : buildPackCard(pkg, { humorWarning: h, steamUrl: s }));
+  };
   const [drawing, setDrawing] = useState(false);
   const [posterPath, setPosterPath] = useState<string | null>(null);
   const [posterBroken, setPosterBroken] = useState(false);
@@ -54,8 +62,27 @@ export function Publish({ pack, onClose }: Props) {
           <button className="icon" onClick={onClose} disabled={drawing} title="Закрыть">×</button>
         </header>
 
+        <div className="buttons">
+          <button className={kind === "vk" ? "primary" : ""} onClick={() => show("vk")}>Пост ВК</button>
+          <button className={kind === "card" ? "primary" : ""} onClick={() => show("card")} title="Описание в шаблоне топ-паков: сложность, время, число вопросов">
+            Описание пака
+          </button>
+        </div>
+        {kind === "card" && (
+          <>
+            <label className="check">
+              <input type="checkbox" checked={humor} onChange={(e) => { setHumor(e.target.checked); show("card", e.target.checked); }} />
+              Предупредить о чёрном и взрослом юморе
+            </label>
+            <label>
+              Ссылка на пак в Steam Workshop (если выложили)
+              <input value={steam} placeholder="https://steamcommunity.com/sharedfiles/filedetails/?id=…" onChange={(e) => { setSteam(e.target.value); show("card", humor, e.target.value); }} />
+            </label>
+            <p className="muted">Это описание — для FirePacks, темы паков в группе SIGame ВКонтакте и Steam Workshop: у топ-паков оно в таком же шаблоне. Сложность берётся из свойств пака.</p>
+          </>
+        )}
         <label>
-          Текст поста (можно править)
+          {kind === "vk" ? "Текст поста" : "Описание пака"} (можно править)
           <textarea className="publish-text" rows={16} value={text} onChange={(e) => setText(e.target.value)} />
         </label>
         <p className="muted">Символов: {text.length}</p>

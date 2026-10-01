@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVkPost, reviewsUrl } from "../src/core/siq/publish";
+import { buildPackCard, buildVkPost, difficultyLabel, playTimeLabel, reviewsUrl } from "../src/core/siq/publish";
 import { newQuestion } from "../src/core/siq/helpers";
 import type { Package } from "../src/core/siq/model";
 
@@ -94,5 +94,39 @@ describe("пост ВК: точно", () => {
     const pkg = samplePack();
     delete pkg.tags;
     expect(buildVkPost(pkg).endsWith("#свояк #sigame #своя_игра\nСделано в Ye!Studio")).toBe(true);
+  });
+});
+
+describe("buildPackCard", () => {
+  /** Готовый вопрос: текст и ответ, иначе клетка считается пустой. */
+  const ready = (price: number) => ({ ...newQuestion(price), params: [{ name: "question", type: "content", children: [{ kind: "item" as const, item: { value: "?" } }] }], right: ["!"] });
+
+  it("шаблон топа: о паке, [сложность] [время] [число вопросов], как играть, ссылки", () => {
+    const pkg = samplePack();
+    pkg.attrs.push(["difficulty", "3"], ["restriction", "18+"]);
+    pkg.rounds![0].themes![0].questions = [ready(100), ready(200), newQuestion(300)];
+    expect(buildPackCard(pkg, { steamUrl: " https://steamcommunity.com/sharedfiles/filedetails/?id=1 " })).toBe(
+      "Пак для теста поста ВК.\n\n" +
+        "[Уровень сложности: 🟢 Легко]\n[Время прохождения: ~0,5 ч]\n[Число вопросов: 2]\n[Возраст: 18+]\n\n" +
+        "Играть лучше с фальстартами и ведущим-человеком. Если плохо грузит медиа — играйте через браузер.\n\n" +
+        "💬 Отзывы и оценки: уепак.рф/11\nSteam: https://steamcommunity.com/sharedfiles/filedetails/?id=1",
+    );
+  });
+
+  it("предупреждение о юморе — по галочке; без сложности и Steam строк нет", () => {
+    const pkg = samplePack();
+    pkg.info = {};
+    const text = buildPackCard(pkg, { humorWarning: true });
+    expect(text.startsWith("⚠️ В паке есть чёрный")).toBe(true);
+    expect(text).not.toContain("Уровень сложности");
+    expect(text).not.toContain("Steam");
+  });
+
+  it("сложность и время — как в описаниях топ-паков", () => {
+    expect([1, 3, 4, 6, 7, 10].map(difficultyLabel)).toEqual(["🟢 Легко", "🟢 Легко", "🟡 Нормально", "🟡 Нормально", "🔴 Сложно", "🔴 Сложно"]);
+    expect(difficultyLabel(NaN)).toBeUndefined();
+    expect(playTimeLabel(152)).toBe("~1,5 ч");
+    expect(playTimeLabel(175)).toBe("~2 ч");
+    expect(playTimeLabel(10)).toBe("~0,5 ч");
   });
 });

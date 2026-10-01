@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { blankPreset, toTemplate } from "../../core/ai/presetText";
 import { PhrasePicker } from "./PhrasePicker";
 import { PresetEditor } from "./PresetEditor";
-import type { GeneratedImage, ImagePreset, ImageStyleInfo, MediaInfo, QuotaInfo, WorkHit } from "../../shared/api";
+import type { GeneratedImage, ImageModelInfo, ImagePreset, ImageStyleInfo, MediaInfo, QuotaInfo, WorkHit } from "../../shared/api";
 import { Icon } from "./Icon";
 
 interface Props {
@@ -26,6 +26,12 @@ const SIZES = [
   { id: "1024x1024", title: "квадрат", w: 1024, h: 1024 },
   { id: "768x1024", title: "портрет", w: 768, h: 1024 },
 ];
+
+/** Выбранную модель помним: автор, взявший Pony для своей темы, не должен выбирать её к каждой картинке. */
+const MODEL_KEY = "imageStudio.model";
+function loadModel(): string {
+  try { return localStorage.getItem(MODEL_KEY) ?? ""; } catch { return ""; }
+}
 
 /** Смелость сцены помним между запусками: автор выставил под свою тему — так и оставить. */
 const TEMP_KEY = "imageStudio.temperature";
@@ -75,12 +81,32 @@ function cleanError(e: unknown): string {
   return String((e as Error).message).replace(/^Error invoking remote method '[^']+':\s*(Error:\s*)?/, "");
 }
 
+/** «lmstudio:qwen/…: fetch failed» → «lmstudio: не запущен» — коротко и по-русски, для подсказки. */
+function skipReason(raw: string): string {
+  const i = raw.indexOf(": ");
+  const who = (i > 0 ? raw.slice(0, i) : raw).replace(/:.*$/, "");
+  const why = i > 0 ? raw.slice(i + 2) : "";
+  const short =
+    /fetch failed|ECONNREFUSED|не запустился/i.test(why) ? "не запущен"
+    : /429|quota|daily free allocation|лимит/i.test(why) ? "лимит исчерпан"
+    : /цензур/i.test(why) ? "отказалась (цензура)"
+    : /пауз/i.test(why) ? "на паузе после сбоя"
+    : /timeout|aborted/i.test(why) ? "не ответил вовремя"
+    : why.split("\n")[0].slice(0, 80);
+  return `${who}: ${short}`;
+}
+
 export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props) {
   const [presets, setPresets] = useState<ImagePreset[]>([]);
   const [preset, setPreset] = useState("literal");
   const [phrase, setPhrase] = useState("");
   const [prompt, setPrompt] = useState("");
   const [promptBy, setPromptBy] = useState("");
+  /**
+   * Кто из очереди выбыл до того, как сцену придумали: «почему отвечает не первая модель?» —
+   * LM Studio не запущен, у Gemini кончился лимит, GPT-OSS отказался… Видно по наведению.
+   */
+  const [promptSkipped, setPromptSkipped] = useState<string[]>([]);
   /** Какое произведение узнала модель — чтобы промах был виден до рисования. */
   const [work, setWork] = useState("");
   /** Подсказки Wikidata к названию («фильм по детскому рисунку») и выбранное из них произведение. */
@@ -90,6 +116,9 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   /** Номер запроса подсказок: ответ на устаревший запрос не показываем. */
   const hitsSeq = useRef(0);
   const [size, setSize] = useState(SIZES[0].id);
+  /** "" — по очереди моделей; иначе «провайдер:модель», выбранная в окне. */
+  const [model, setModel] = useState(loadModel);
+  const [models, setModels] = useState<ImageModelInfo[]>([]);
   const [img, setImg] = useState<GeneratedImage | null>(null);
   const [busy, setBusy] = useState<"" | "prompt" | "image" | "save">("");
   const [note, setNote] = useState("");
@@ -114,6 +143,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
   useEffect(() => {
     void window.api.imagePresets().then(setPresets);
     void window.api.imageStyles().then(setStyles);
+    void window.api.imageModels().then(setModels).catch(() => setModels([]));
     loadQuota();
     // окно закрыли посреди генерации — не ждём ответа зря
     return () => { void window.api.imageCancel(); };
@@ -220,6 +250,7 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
       const r = await window.api.imagePrompt(phrase, preset, temperature, suggests && chosen ? chosen : undefined);
       setPrompt(r.text);
       setPromptBy(r.model);
+      setPromptSkipped(r.skipped ?? []);
       setWork(r.work ?? "");
       return r.text;
     } catch (e) {
@@ -253,7 +284,9 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
     setPaidOffer([]);
     try {
       const own = current?.styleMode === "own" ? current.styleText.trim() : "";
-      const r = await window.api.imageGenerate(text, s.w, s.h, allowPaid, style, own || undefined);
+      // выбранной модели больше нет в настройках — рисуем по очереди, а не падаем
+      const only = models.some((m) => m.ref === model) ? model : undefined;
+      const r = await window.api.imageGenerate(text, s.w, s.h, allowPaid, style, own || undefined, only);
       if ("needPaid" in r) {
         setPaidOffer(r.needPaid);
         setNote(`Бесплатные модели не нарисовали: ${r.skipped.join(" · ")}`);
@@ -430,6 +463,23 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
               {SIZES.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
             </select>
           </label>
+          {models.length > 1 && (
+            <label className="narrow">
+              Модель
+              <select
+                value={models.some((m) => m.ref === model) ? model : ""}
+                onChange={(e) => { setModel(e.target.value); try { localStorage.setItem(MODEL_KEY, e.target.value); } catch { /* не запомнится — не беда */ } }}
+                title="«По очереди» — первая модель, которая нарисует. Свои модели работают на вашей видеокарте, первая картинка — с загрузкой модели"
+              >
+                <option value="">по очереди</option>
+                {models.map((m) => (
+                  <option key={m.ref} value={m.ref}>
+                    {m.title}{m.uncensored ? " — без цензуры" : ""}{m.paid ? " (платно)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className="primary ws-run" onClick={() => void both()} disabled={!!busy}>
             {busy === "prompt" ? "Придумываю сцену…" : busy === "image" ? "Рисую…" : "Нарисовать"}
           </button>
@@ -438,6 +488,11 @@ export function ImageStudio({ onInsert, insertTarget, onAdded, onOpenAi }: Props
         <label className="ig-prompt">
           <span>
             Сцена для рисования {promptBy && <span className="muted">— придумала {shortModel(promptBy)}</span>}
+            {promptBy && promptSkipped.length > 0 && (
+              <span className="muted ig-skipped" title={promptSkipped.map(skipReason).join("\n")}>
+                · до неё пропущены: {promptSkipped.length}
+              </span>
+            )}
             {work && <span className="muted" title="Не тот фильм? Допишите уточнение в скобках: «Солнцестояние (2019)» или «(Midsommar)» — и «Другая сцена»">· узнала: <b>{work}</b></span>}
             {fromPhrase && (
               <button className="small" onClick={() => void makePrompt()} disabled={!!busy || !phrase.trim()} title="Попросить модель описать сцену заново">

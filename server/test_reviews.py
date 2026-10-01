@@ -80,6 +80,17 @@ class StoreTest(unittest.TestCase):
         self.s.hide("9", "Капитан Немо")
         self.assertEqual(self.s.board("9"), [])
 
+    def test_quotes_for_home(self):
+        self.s.save("9", PID, {"txt:author": "Спасибо, было весело"}, "Капитан Немо", 0, "1.1.1.1")
+        self.s.save("9", "a" * 24, {"txt:author": "Заходи на spam.ru, там лучше"}, None, 0, "1.1.1.1")
+        self.s.save("9", "b" * 24, {"txt:author": "Длинно. " + "очень " * 60, "txt:idea": "не цитата"}, "Болтун", 0, "1.1.1.1")
+        q = {x["nick"]: x for x in self.s.quotes()}
+        self.assertEqual(set(q), {"Капитан Немо", "Болтун"})          # ссылка не прошла, idea не цитируется
+        self.assertEqual(q["Капитан Немо"]["text"], "Спасибо, было весело")
+        self.assertLessEqual(len(q["Болтун"]["text"]), 161)
+        self.s.hide("9", "Болтун")
+        self.assertEqual([x["nick"] for x in self.s.quotes()], ["Капитан Немо"])
+
     def test_export(self):
         self.s.save("9", PID, {"rating": 4, "dis": ["ai"], "th:r1t2": "poop",
                                "q:r1t1q2": {"r": "meh", "why": ["dup", "boring"]}, "txt:idea": "Узнай пиво по пробке"},

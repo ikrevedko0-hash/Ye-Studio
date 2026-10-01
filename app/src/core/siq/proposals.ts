@@ -24,6 +24,17 @@ export interface ProposalQuestion {
   /** Ещё засчитываемые ответы. */
   accept: string[];
   options: string[];
+  /** Реплики ведущему на ожидаемые ошибки («Нет, Скайрим не инди-игра») → <wrong>. */
+  wrong: string[];
+  /** Реплика ведущего: читается вслух, на экран не выводится (placement="replic"). */
+  host?: string;
+  /** Что показать на экране при ответе — подпись-панчлайн (к картинке ответа или вместо сухого ответа). */
+  answerText?: string;
+  /** Частичный зачёт/бонус («x2, если назовёте и город») — дописывается к тексту вопроса. */
+  bonus?: string;
+  /** Какое видео найти в вопрос / в ответ: поиска видео в окне пока нет, остаётся пометка. */
+  video?: string;
+  answerVideo?: string;
 }
 
 export interface ProposalTheme {
@@ -37,6 +48,8 @@ export interface ProposalTheme {
 export type ParseResult = { ok: true; themes: ProposalTheme[]; warnings: string[] } | { ok: false; error: string };
 
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : typeof v === "number" ? String(v) : "");
+/** Строка или массив строк → массив непустых строк. */
+const strList = (v: unknown): string[] => (Array.isArray(v) ? v.map(str).filter(Boolean) : str(v) ? [str(v)] : []);
 const norm = (s: string) => s.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
 
 /** Запрос картинки: строка или объект старого формата { kind, search, what }. */
@@ -98,6 +111,12 @@ export function parseProposals(input: string): ParseResult {
         answerImage: imageQuery(x.answerImage ?? x.answerMedia),
         accept: Array.isArray(x.accept) ? x.accept.map(str).filter(Boolean) : [],
         options: Array.isArray(x.options) ? x.options.map(str).filter(Boolean).slice(0, OPTION_LETTERS.length) : [],
+        wrong: strList(x.wrong),
+        host: str(x.host ?? x.replic) || undefined,
+        answerText: str(x.answerText) || undefined,
+        bonus: str(x.bonus) || undefined,
+        video: str(x.video) || undefined,
+        answerVideo: str(x.answerVideo) || undefined,
       });
     });
     if (!questions.length) { warnings.push(`«${name}»: нет вопросов — пропущена`); return; }
@@ -218,23 +237,34 @@ function fill(q: Question, row: PlanRow, media: RowMedia) {
     q.params.unshift(param);
   }
   const lost = p.image && !media.question ? ` [🖼 найти: ${p.image}]` : "";
-  const text = (p.text + lost).trim();
+  const video = p.video ? ` [🎬 найти: ${p.video}]` : "";
+  const bonus = p.bonus ? ` (${p.bonus})` : "";
+  const text = (p.text + bonus + lost + video).trim();
   let items: ContentItem[] = text ? [{ value: text }] : [];
   if (media.question) items = appendMedia(items, [imageItem(media.question)]);
   if (!items.length) items = [{ value: "" }];
+  // реплика ведущего — первой: её произносят, пока на экране вопрос
+  if (p.host) items = [{ value: p.host, placement: "replic" }, ...items];
   param.children = [...items.map((item) => ({ kind: "item" as const, item })), ...param.children.filter((c) => c.kind !== "item")];
 
-  if (media.answer) {
+  const answer: ContentItem[] = [];
+  if (media.answer) answer.push(imageItem(media.answer));
+  if (p.answerText) answer.push({ value: p.answerText });
+  if (answer.length) {
     q.params = q.params.filter((x) => x.name !== "answer");
-    q.params.push({ name: "answer", type: "content", children: [{ kind: "item", item: imageItem(media.answer) }] });
-  } else if (p.answerImage) {
-    q.info = { ...q.info, comments: [q.info?.comments, `🖼 к ответу найти: ${p.answerImage}`].filter(Boolean).join("\n") };
+    q.params.push({ name: "answer", type: "content", children: answer.map((item) => ({ kind: "item" as const, item })) });
   }
+  const todo = [
+    p.answerImage && !media.answer ? `🖼 к ответу найти: ${p.answerImage}` : "",
+    p.answerVideo ? `🎬 к ответу найти: ${p.answerVideo}` : "",
+  ].filter(Boolean);
+  if (todo.length) q.info = { ...q.info, comments: [q.info?.comments, ...todo].filter(Boolean).join("\n") };
 
   setOptions(q, p.options);
   // при вариантах SIGame засчитывает букву: ищем ответ среди вариантов
   const letter = p.options.findIndex((o) => norm(o) === norm(p.answer));
   q.right = [letter >= 0 ? OPTION_LETTERS[letter] : p.answer, ...p.accept];
+  q.wrong = p.wrong.length ? p.wrong : undefined;
 }
 
 /**

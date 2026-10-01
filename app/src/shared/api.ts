@@ -12,7 +12,9 @@ import type { GeneratorArgs, PuzzleTheme, WordHit } from "../core/words/generato
 import type { ImagePreset } from "../core/ai/presetText";
 import type { WorkHit } from "../core/ai/works";
 import type { QuotaInfo } from "../core/ai/quota";
+import type { ImageModelInfo } from "../core/ai/image";
 import type { PhraseSet } from "../core/words/phrases";
+import type { Suggestion, SuggestOptions } from "../core/rebus/suggest";
 import type { ProfileId, SystemReport } from "../core/system/probe";
 import type { ComponentsState, InstallProgress } from "../core/components/manifest";
 import type { SigameProgress } from "../core/sigame/run";
@@ -54,10 +56,11 @@ export interface PhraseDictionary {
   kinds: { id: string; title: string }[];
   styles: { id: string; title: string }[];
 }
+import type { SpeakRequest, TranslateResult, VoiceKeepInfo, VoiceSpeakResult, VoiceState } from "../core/tts/types";
 import type { AiSettings, ProviderEdit, ProviderTemplate } from "../core/ai/settings";
 
 export type { DictStats, GeneratorArgs, GeneratorInfo, PuzzleTheme, WordHit };
-export type { AiSettings, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo, WorkHit };
+export type { AiSettings, ImageModelInfo, ImagePreset, ProviderEdit, ProviderTemplate, QuotaInfo, WorkHit };
 
 /** Бесплатные модели не справились, платные есть — окно спрашивает автора. */
 export interface NeedPaid {
@@ -104,6 +107,8 @@ export interface PackDTO {
   path?: string;
   pkg: Package;
   media: MediaInfo[];
+  /** В архиве есть quality.marker — SIGame показывает пак как прошедший контроль качества. */
+  quality?: boolean;
   /** Только для самопроверки: открыть редактор медиа сразу после загрузки. */
   openEditorMedia?: MediaInfo;
   /** Только для самопроверки: открыть сборку коллажа сразу после загрузки. */
@@ -251,6 +256,8 @@ export interface Api {
   pasteTheme(): Promise<{ theme: Theme; media: MediaInfo[]; renamed: string[] } | null>;
   addMedia(paths?: string[]): Promise<MediaInfo[]>;
   removeMedia(folder: string, name: string): Promise<boolean>;
+  /** Галочка «контроль качества» SIGame (quality.marker в архиве). */
+  setQuality(on: boolean): Promise<boolean>;
   reveal(path: string): Promise<void>;
   /** Текст из буфера обмена (для «📋 Из Claude»). */
   clipboardText(): Promise<string>;
@@ -351,6 +358,8 @@ export interface Api {
   wordGenerators(): Promise<GeneratorInfo[]>;
   wordStats(): Promise<DictStats[]>;
   wordRun(id: string, args: GeneratorArgs): Promise<PuzzleTheme>;
+  /** Ребусы: варианты разбора ответа по словарю существительных (core/rebus/suggest.ts). */
+  rebusSuggest(answer: string, opts?: SuggestOptions): Promise<Suggestion[]>;
   // ---------- генерация картинок ----------
   imagePresets(): Promise<ImagePreset[]>;
   /** Словарь фразеологизмов и пословиц (скачан заранее, из сети не читается). */
@@ -370,11 +379,25 @@ export interface Api {
   worksSearch(query: string): Promise<WorkHit[]>;
   /** style — id из imageStyles.ts: его английское описание дописывается к сцене. */
   /** ownStyle — свой английский текст стиля пресета: дописывается вместо стиля с галочки. */
-  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string, ownStyle?: string): Promise<GeneratedImage | NeedPaid>;
+  /** only — рисовать только этой моделью («провайдер:модель»), а не по очереди. */
+  imageGenerate(prompt: string, width: number, height: number, allowPaid?: boolean, style?: string, ownStyle?: string, only?: string): Promise<GeneratedImage | NeedPaid>;
+  /** Модели для выбора в окне «Картинки»: очередь и свои модели вне очереди. */
+  imageModels(): Promise<ImageModelInfo[]>;
   imageStyles(): Promise<ImageStyleInfo[]>;
   /** Картинку от ИИ — оригиналом в библиотеку (с моделью, стилем и сценой) и копией в пак. */
   imageKeep(dataUrl: string, phrase: string, info: { model: string; style?: string; prompt: string }): Promise<MediaInfo>;
   imageCancel(): Promise<void>;
+  // ---------- перевод + озвучка ----------
+  /** Что установлено: движки озвучки, голоса Piper, есть ли переводчик. */
+  voiceState(): Promise<VoiceState>;
+  /** Перевод фразы: до трёх вариантов. target — id из core/tts/languages (none, la, en, …, custom); custom — инструкция для «Свой вариант». Облако — только при allowCloud. */
+  voiceTranslate(text: string, target: string, custom: string, allowCloud: boolean): Promise<TranslateResult>;
+  /** Озвучить: wav во временной папке + байты для предпросмотра (Blob → URL.createObjectURL). */
+  voiceSpeak(req: SpeakRequest): Promise<VoiceSpeakResult>;
+  /** Оставить озвучку: оригинал — в библиотеку, mp3 (или wav без ffmpeg) — в пак. */
+  voiceKeep(wavPath: string, info: VoiceKeepInfo): Promise<MediaInfo>;
+  /** Прервать перевод или озвучку. */
+  voiceCancel(): Promise<void>;
   // ---------- настройки ИИ ----------
   aiSettings(): Promise<AiSettings>;
   aiSettingsSave(s: AiSettings): Promise<AiSettings>;

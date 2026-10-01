@@ -18,6 +18,10 @@ export interface ManifestFile {
   unzipTo?: string;
   /** Из архива взять только эти файлы (по имени, без папок); не задано — всё. */
   extract?: string[];
+  /** Распаковать с сохранением папок (Piper держит espeak-ng-data/ рядом с exe); без флага — плоско. */
+  keepTree?: boolean;
+  /** С keepTree: срезать этот префикс путей в архиве («piper/»); записи вне префикса пропускаются. */
+  stripPrefix?: string;
 }
 
 export interface ProfileSpec {
@@ -61,6 +65,11 @@ export function parseManifest(raw: string): Manifest {
     if (!/^[0-9a-f]{64}$/.test(f.sha256)) throw new Error(`файл ${id}: нет суммы SHA256`);
     if (!(f.size > 0)) throw new Error(`файл ${id}: нет размера`);
     if (!f.path === !f.unzipTo) throw new Error(`файл ${id}: нужен либо path, либо unzipTo`);
+    if (f.keepTree !== undefined && typeof f.keepTree !== "boolean") throw new Error(`файл ${id}: keepTree должен быть true или false`);
+    if (f.keepTree && !f.unzipTo) throw new Error(`файл ${id}: keepTree только для архивов (unzipTo)`);
+    if (f.stripPrefix !== undefined && (!f.keepTree || !/^([^/\\:.][^/\\:]*\/)+$/.test(f.stripPrefix))) {
+      throw new Error(`файл ${id}: stripPrefix — папка вида «piper/» и только вместе с keepTree`);
+    }
   }
   return m;
 }

@@ -521,6 +521,15 @@ label.check.inline input { width: auto; }
 .ws-insert { font-size: 12px; padding: 1px 6px; min-width: 24px; opacity: .45; }
 .ws-hit:hover .ws-insert, .ws-hit.sel .ws-insert { opacity: 1; }
 .ws-hit .muted { font-size: 11px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Строки кубраи: ответ и загадка крупно, разбор ниже целиком — две колонки на широком окне */
+.ws-results.rows { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 6px; }
+.ws-hit.ws-row { align-items: flex-start; padding: 7px 10px; }
+.ws-row input { margin-top: 3px; }
+.ws-row-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.ws-row-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ws-row-head b { font-size: 14px; }
+.ws-row .ws-puzzle { margin: 0; font-family: inherit; letter-spacing: 0; font-size: 14px; font-weight: 600; }
+.ws-hit .ws-row-why { margin-left: 0; white-space: normal; overflow: visible; font-size: 12px; line-height: 1.35; }
 
 /* панель отбора слов: счётчик и кнопки выделения стоят над списком, чтобы их было видно */
 .ws-pickbar { display: flex; align-items: center; gap: 10px; font-size: 12px; padding: 4px 0; border-bottom: 1px solid var(--line); }
@@ -607,6 +616,18 @@ button.link.inline { padding: 0; }
 .ig-stage { flex: 1; min-height: 240px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
 .ig-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .ig-actions { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+/* Студия → «Голос» */
+.word-studio button:disabled { opacity: .45; cursor: default; }
+.vs-main { display: flex; flex-direction: column; gap: 10px; }
+.vs-check { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; margin: 0; }
+.vs-check input { width: auto; margin: 0; flex: none; }
+.vs-variants { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.vs-variant { text-align: left; font-size: 14px; padding: 6px 10px; white-space: normal; }
+.vs-variant.sel { border-color: var(--gold); color: var(--gold); }
+.vs-player { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.vs-player audio { height: 36px; }
+.vs-place { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.vs-main .mc-errors { display: flex; align-items: center; gap: 10px; }
 .ig-work { flex: 1; min-height: 360px; display: flex; gap: 10px; }
 .ig-work .ig-stage { min-width: 0; }
 .ig-work .pp { flex: 0 0 420px; min-height: 0; overflow: hidden; }
@@ -624,6 +645,7 @@ button.link.inline { padding: 0; }
 .ai-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
 .ai-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
 .ai-grid label.wide { grid-column: 1 / -1; }
+.ai-grid .ai-launch-title { grid-column: 1 / -1; font-size: 12px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }
 .ai-grid textarea { font-family: Consolas, monospace; font-size: 12px; }
 .ai-grid label.ai-check { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13px; }
 .ai-grid label.ai-check input { width: auto; }
@@ -862,6 +884,7 @@ label.secs input:disabled { opacity: .5; }
 /* объём пака */
 .chip-btn { cursor: pointer; border: none; font: inherit; }
 .chip-btn.over { background: var(--danger); color: #fff; }
+.editor .muted.over { color: var(--danger); opacity: 1; }
 .pack-size { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(860px, 94vw); max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
 .pack-size header, .pack-size footer { display: flex; align-items: center; gap: 10px; }
 .pack-size footer { align-items: flex-start; }
@@ -1057,3 +1080,46 @@ button:has(> .ico), header > b:has(> .ico) { display: inline-flex; align-items: 
 .sr-shots figcaption { color: var(--muted); font-size: 11px; }
 .sr-zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, .8); display: flex; align-items: center; justify-content: center; cursor: zoom-out; z-index: 100; }
 .sr-zoom img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }
+
+/* ---------- студия: ребусы ---------- */
+.rb-body .ws-side { gap: 8px; }
+.rb-answer { display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.rb-answer input { font-family: var(--font-display); font-size: 16px; letter-spacing: .04em; text-transform: uppercase; }
+.rb-found { display: flex; flex-direction: column; gap: 4px; overflow: auto; min-height: 0; }
+.rb-main { overflow: auto; }
+.rb-stage { position: relative; flex: 1; min-height: 220px; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; padding: 8px; }
+.rb-stage canvas { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 4px; }
+.rb-empty { position: absolute; font-size: 12px; }
+.rb-reads { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.rb-reads b { font-family: var(--font-display); letter-spacing: .04em; }
+.rb-ok { color: var(--ready); }
+.rb-bad { color: var(--danger); }
+.rb-explain { font-size: 12px; }
+.rb-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rb-chip { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 6px; padding: 2px; background: var(--bg); }
+.rb-chip.sel { border-color: var(--gold); }
+.rb-chip button { border: none; background: transparent; }
+.rb-chip button.small { font-size: 12px; padding: 0 5px; min-width: 0; }
+.rb-chip-main { font-size: 13px; padding: 2px 8px; }
+.rb-add { display: inline-flex; gap: 4px; margin-left: auto; }
+.rb-add button.small { font-size: 12px; padding: 2px 8px; }
+.rb-look { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted); }
+.rb-look label:not(.ig-style) { display: flex; align-items: center; gap: 6px; }
+.rb-look input[type="range"] { width: 110px; }
+.rb-hint { padding: 10px; border: 1px dashed var(--gold); border-radius: 8px; color: var(--gold); font-size: 13px; line-height: 1.4; }
+.rb-props { width: 300px; border-left: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow: auto; font-size: 12px; }
+.rb-group { display: flex; flex-direction: column; gap: 7px; }
+.rb-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rb-row > .muted:first-child { width: 78px; flex-shrink: 0; }
+.rb-row input:not([type]) , .rb-row select { flex: 1; min-width: 0; }
+.rb-row input.rb-letter { flex: 0 0 44px; text-align: center; text-transform: uppercase; }
+.rb-step { display: inline-flex; align-items: center; gap: 4px; }
+.rb-step + .rb-step { margin-left: 84px; }
+.rb-row > .rb-step:first-of-type { min-width: 0; }
+.rb-step b { min-width: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.rb-step button.small { padding: 0 7px; font-size: 12px; }
+.rb-check { align-self: flex-start; }
+.rb-pic { display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--line); padding-top: 8px; }
+.rb-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.rb-thumbs button { padding: 0; aspect-ratio: 1; overflow: hidden; background: var(--bg); }
+.rb-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }

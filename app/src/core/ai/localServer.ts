@@ -70,6 +70,9 @@ export async function ensureLocalServer(id: string, p: AiProvider, signal?: Abor
   if (await alive(p, signal)) { touch(id); return; }
   const launch = resolveLaunch(p.launch, launchBase());
   if (!running.has(id)) {
+    // На 8 ГБ видеопамяти две модели разом не живут: FLUX, Pony и текстовая Qwen друг друга вытесняют.
+    // Поэтому перед запуском гасим остальные свои серверы — следующий запрос к ним поднимет их заново.
+    for (const other of [...running.keys()]) if (other !== id) stopLocalServer(other);
     const cwd = launch.cwd;
     // вывод сервера — в файл рядом с моделями: когда что-то не так, смотреть туда
     const log = cwd ? openSync(join(cwd, "server.log"), "w") : "ignore";
