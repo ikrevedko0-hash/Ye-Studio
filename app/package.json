@@ -16,6 +16,7 @@
     "roundtrip": "tsx scripts/roundtrip.ts",
     "pack": "electron-vite build && electron-builder --win dir",
     "fetch-dict": "tsx scripts/fetch-dict.ts",
+    "fetch-thesaurus": "tsx scripts/fetch-thesaurus.ts",
     "providers-test": "tsx scripts/providers-test.ts",
     "fetch-wordsets": "tsx scripts/fetch-wordsets.ts",
     "fetch-initials": "tsx scripts/fetch-initials.ts",

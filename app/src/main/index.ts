@@ -26,13 +26,14 @@ import { cleanupCode, initUpdater } from "./updater";
 import { appVersion, boot } from "./version"; // ---------- обновления ----------
 import { closeSplash, showSplash } from "./splash";
 // ---------- связь с сервером автора: выключение по ID, отчёты об ошибках, обратная связь ----------
-import { captureFeedbackShot, initRemote, packDupCheck, queueError, sendFeedback } from "./remote";
+import { captureFeedbackShot, initRemote, installId, packDupCheck, queueError, sendFeedback } from "./remote";
 import { crc32 } from "node:zlib";
 import { dupQuestions, toReport } from "../core/siq/dupCheck";
 import type { FeedbackRequest } from "../shared/api";
 import type { DownloadWish, FetchProgress, MediaResult, ProviderConfig, SearchQuery, SourceMeta } from "../core/media/providers/types";
 import { Dictionary } from "../core/words/dict";
 import { generatorById, generatorInfos } from "../core/words/generators/registry";
+import { POOL, sampleHits, seedFrom } from "../core/words/generators/shuffle";
 import { setWordSourceDirs, wordSourceDirs } from "../core/words/sources/registry";
 import { loadPhrases, PHRASE_KINDS, PHRASE_STYLES } from "../core/words/phrases";
 import type { GeneratorArgs } from "../core/words/generators/types";
@@ -1268,7 +1269,13 @@ function registerIpc() {
   ipcMain.handle("words:run", async (_e, id: string, args: GeneratorArgs) => {
     const g = generatorById(id);
     if (!g) throw new Error(`неизвестный генератор ${id}`);
-    return g.run(dict(), args);
+    // Находок просим с запасом и берём случайную выборку с перевесом в пользу лучших (shuffle.ts):
+    // зерно по умолчанию своё у каждой копии программы, «Перемешать» в окне присылает новое
+    const { shuffle, ...rest } = args;
+    const limit = Number(rest.limit) || 60;
+    const t = await g.run(dict(), { ...rest, limit: limit * POOL });
+    const seed = typeof shuffle === "number" && shuffle > 0 ? shuffle : seedFrom(await installId());
+    return { ...t, hits: sampleHits(t.hits, limit, seed) };
   });
 
   // ---------- студия слов: генерация картинок ----------
@@ -2671,7 +2678,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       open?.click();
       let tab = null;
       for (let i = 0; i < 40 && !tab; i++) { await wait(50); tab = byText(".ws-tabs button", "Картинки"); }
@@ -2853,7 +2860,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
       open.click();
       let params = null;
@@ -2940,8 +2947,8 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         const howMany = ${Number(arg("word-insert-times")) || 3};
         // У инициалов и матрицы (генератор по умолчанию) текст вопроса пишет автор: вставка ставит
         // только ответ, и проверять надо, что прежний текст вопроса остался как был.
-        // Загадку в текст кладут только анаграммы.
-        const answerOnly = !/Анаграм/.test(want);
+        // Загадку в текст кладут анаграммы и кубрая; у кубраи в плитке «загадка — разбор», в вопрос идёт загадка.
+        const answerOnly = !/Анаграм|Кубра/.test(want);
         const textsOf = (q) => (q?.params ?? []).flatMap((x) => (x.children ?? []).map((c) => c.item?.value));
         const before = (window.__pack?.rounds?.[0]?.themes?.[0]?.questions ?? []).map((q) => JSON.stringify(textsOf(q)));
         const put = [];
@@ -2958,7 +2965,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
         const landed = put.map((p, n) => {
           const q = questions[1 + n];
           const texts = textsOf(q);
-          const текстНаМесте = answerOnly ? JSON.stringify(texts) === before[1 + n] : texts.includes(p.puzzle);
+          const текстНаМесте = answerOnly ? JSON.stringify(texts) === before[1 + n] : texts.includes(String(p.puzzle).split(" — ")[0]);
           return { ждали: p.word, ответ: q?.right?.[0], текстНаМесте, всегоТекстов: texts.filter(Boolean).length };
         });
         return {
@@ -3155,7 +3162,7 @@ async function selfTest(win: BrowserWindow, arg: (n: string) => string | undefin
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const byText = (sel, text) => [...document.querySelectorAll(sel)].find((b) => b.textContent.includes(text));
       let open = null;
-      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = byText(".file-actions button", "Студия"); }
+      for (let i = 0; i < 60 && !open; i++) { await wait(100); open = document.querySelector(".tb-studio"); }
       if (!open) return { ok: false, why: "нет кнопки «Студия» в шапке" };
       open.click();
       let tab = null;

@@ -62,12 +62,13 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
     setNote("");
   };
 
-  const run = async () => {
+  /** shuffle — новое зерно выборки: без него у этой копии программы выдача стабильная (зерно — install-id). */
+  const run = async (shuffle?: number) => {
     if (!current) return;
     setBusy(true);
     setNote("");
     try {
-      const t = await window.api.wordRun(current.id, args);
+      const t = await window.api.wordRun(current.id, shuffle ? { ...args, shuffle } : args);
       setTheme(t);
       // Отмечаем ровно столько, сколько вопросов встанет в тему: обычно семь. Раньше
       // отмечалось всё подряд, и автор снимал галочки с полусотни слов вручную.
@@ -156,6 +157,14 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
                   </label>
                 ))}
                 <button className="primary ws-run" onClick={() => void run()} disabled={busy}>{busy ? "Считаю…" : "Подобрать"}</button>
+                <button
+                  className="ws-run"
+                  onClick={() => void run(1 + Math.floor(Math.random() * 0x7ffffffe))}
+                  disabled={busy}
+                  title="Другая выборка из находок: известные слова выходят чаще, но не всегда одни и те же"
+                >
+                  <Icon name="shuffle" />Перемешать
+                </button>
               </div>
             )}
 
