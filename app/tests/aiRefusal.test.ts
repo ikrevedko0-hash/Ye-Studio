@@ -51,7 +51,7 @@ describe("модели картинок для выбора", () => {
   const cfg: AiConfig = {
     providers: {
       sdcpp: { title: "Своя видеокарта", base: "http://127.0.0.1:7861/v1", imageModels: ["sd-cpp-local"], launch: { exe: "sd-server.exe" } },
-      pony: { title: "Pony V6", base: "http://127.0.0.1:7871/v1", imageModels: ["sd-cpp-local"], launch: { exe: "sd-server.exe" }, uncensored: true },
+      own: { title: "Своя модель", base: "http://127.0.0.1:7871/v1", imageModels: ["sd-cpp-local"], launch: { exe: "sd-server.exe" }, uncensored: true },
       cloudflare: { title: "Cloudflare", base: "x", imageModels: ["@cf/black-forest-labs/flux-2-klein-9b"] },
       off: { title: "Выключен", base: "x", imageModels: ["m"], disabled: true },
     },
@@ -59,12 +59,12 @@ describe("модели картинок для выбора", () => {
   };
 
   it("сначала очередь, потом модели вне очереди; выключенные не показывает", () => {
-    expect(imageModelInfos(cfg).map((m) => m.ref)).toEqual(["sdcpp:sd-cpp-local", "cloudflare:@cf/black-forest-labs/flux-2-klein-9b", "pony:sd-cpp-local"]);
+    expect(imageModelInfos(cfg).map((m) => m.ref)).toEqual(["sdcpp:sd-cpp-local", "cloudflare:@cf/black-forest-labs/flux-2-klein-9b", "own:sd-cpp-local"]);
   });
 
   it("свои модели подписаны названием сервиса и помечены без цензуры", () => {
-    const pony = imageModelInfos(cfg).find((m) => m.ref === "pony:sd-cpp-local")!;
-    expect(pony).toMatchObject({ title: "Pony V6", uncensored: true, local: true });
+    const own = imageModelInfos(cfg).find((m) => m.ref === "own:sd-cpp-local")!;
+    expect(own).toMatchObject({ title: "Своя модель", uncensored: true, local: true });
     expect(imageModelInfos(cfg)[1].title).toBe("Cloudflare: flux-2-klein-9b");
   });
 });
