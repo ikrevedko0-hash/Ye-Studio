@@ -884,6 +884,7 @@ label.secs input:disabled { opacity: .5; }
 /* объём пака */
 .chip-btn { cursor: pointer; border: none; font: inherit; }
 .chip-btn.over { background: var(--danger); color: #fff; }
+.editor .muted.over { color: var(--danger); opacity: 1; }
 .pack-size { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; width: min(860px, 94vw); max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
 .pack-size header, .pack-size footer { display: flex; align-items: center; gap: 10px; }
 .pack-size footer { align-items: flex-start; }

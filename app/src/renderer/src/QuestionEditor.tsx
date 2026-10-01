@@ -26,6 +26,9 @@ interface Props {
   onMoveTo?(round: number, theme: number): void;
 }
 
+/** Сколько знаков комментария темы показывает SIGame (веб-табло обрезает THEME_COMMENTS до 150). */
+const THEME_COMMENT_MAX = 150;
+
 const FOLDER: Record<string, string> = { image: "Images", audio: "Audio", video: "Video" };
 const KIND_LABEL: Record<string, string> = { text: "Текст", image: "Картинка", audio: "Звук", video: "Видео", html: "HTML" };
 
@@ -439,8 +442,27 @@ export function QuestionEditor({ pack, selection, mutate, addMedia, onPriceCommi
         />
       </details>
 
-      <details open={!!q.info?.comments || !!q.info?.showmanComments}>
+      <details open={!!q.info?.comments || !!q.info?.showmanComments || !!theme.info?.comments}>
         <summary>Комментарии</summary>
+        {/* Комментарий темы SIGame показывает всем игрокам, когда тема пошла в игру, и режет до 150 знаков —
+            место для правил незнакомой механики (кубрая, анаграммы). Один на тему: правка видна у всех её вопросов. */}
+        <label>
+          <span>
+            Комментарий темы «{theme.name || "без названия"}» — видят игроки{" "}
+            <span className={`muted${(theme.info?.comments?.length ?? 0) > THEME_COMMENT_MAX ? " over" : ""}`}>
+              {theme.info?.comments?.length ?? 0}/{THEME_COMMENT_MAX}
+            </span>
+          </span>
+          <textarea
+            value={theme.info?.comments ?? ""}
+            rows={2}
+            placeholder="правила темы для игроков: SIGame покажет их, когда тема пойдёт в игру"
+            onChange={(e) => editTheme((t) => { (t.info ??= {}).comments = e.target.value || undefined; })}
+          />
+          {(theme.info?.comments?.length ?? 0) > THEME_COMMENT_MAX && (
+            <span className="hint">SIGame покажет только первые {THEME_COMMENT_MAX} знаков — сократите.</span>
+          )}
+        </label>
         <label>
           Комментарий к вопросу
           <textarea value={q.info?.comments ?? ""} rows={2} onChange={(e) => edit((qq) => { (qq.info ??= {}).comments = e.target.value || undefined; })} />

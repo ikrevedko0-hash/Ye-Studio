@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { explain, inflectLike, makeClues, pieceLemmas, sameRoot, splitWord, type KubrayaDeps } from "../src/core/words/kubraya";
 import { POOL, sampleFresh, sampleHits, seedFrom } from "../src/core/words/generators/shuffle";
 import { MapThesaurus } from "../src/core/words/thesaurus";
+import { KUBRAYA_RULES } from "../src/core/words/generators/kubraya";
 
 const thes = MapThesaurus.parse([
   "балл\tоценка,очко\t",
@@ -91,6 +92,13 @@ describe("загадки", () => {
     const base: KubrayaDeps = { isWord: (w) => all.has(w), fame: () => 0.5, thes: t };
     expect(makeClues("подвал", base).map((c) => c.clue)).toContain("Над волна");
     expect(makeClues("подвал", { ...base, isNoun: (w) => nouns.has(w) })).toEqual([]);
+  });
+});
+
+describe("правила для игроков", () => {
+  it("влезают в комментарий темы: SIGame показывает только 150 знаков", () => {
+    expect(KUBRAYA_RULES.length).toBeLessThanOrEqual(150);
+    expect(KUBRAYA_RULES).toContain("БАЛЛАДА");
   });
 });
 

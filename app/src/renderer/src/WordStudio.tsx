@@ -14,7 +14,8 @@ import { Icon } from "./Icon";
 interface Props {
   onClose(): void;
   /** Создать тему в текущем раунде из отмеченных слов. */
-  onCreateTheme(title: string, hits: WordHit[]): void;
+  /** themeComment — правила для игроков в комментарий темы (кубрая); у прочих генераторов нет. */
+  onCreateTheme(title: string, hits: WordHit[], themeComment?: string): void;
   /** Вставить одну находку в открытый вопрос. Нет выбранного вопроса — нет и кнопки. */
   onInsert?(hit: WordHit): void;
   /** Что сейчас выбрано на табло — показываем в подсказке к кнопке. */
@@ -278,7 +279,7 @@ export function WordStudio({ onClose, onCreateTheme, onInsert, insertTarget, the
             className="primary"
             disabled={!chosen.length}
             title="Создаст тему в текущем раунде: по вопросу на каждое отмеченное слово, ответ уже подставлен"
-            onClick={() => { onCreateTheme(theme?.title ?? "Тема из слов", chosen); onClose(); }}
+            onClick={() => { onCreateTheme(theme?.title ?? "Тема из слов", chosen, theme?.themeComment); onClose(); }}
           >
             Создать тему из отмеченных
           </button>

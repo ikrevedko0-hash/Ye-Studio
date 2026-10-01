@@ -10,6 +10,10 @@ import { stem } from "./matrix";
 import { loadThesaurus } from "../thesaurus";
 import type { GeneratorArgs, PuzzleGenerator, PuzzleTheme, WordHit } from "./types";
 
+/** Правила для игроков, которые кубраю не знают: в комментарий темы, SIGame покажет их при начале темы (≤150 знаков). */
+export const KUBRAYA_RULES =
+  "Каждое слово заменено синонимом или антонимом, куски склеиваются по порядку. «Оценка рая» = БАЛЛ + АДА = БАЛЛАДА.";
+
 const NOTE =
   "Кубрая: каждое слово загадки — синоним или антоним куска ответа, куски склеиваются по порядку. " +
   "Ответ — одно слово. Пометка «форма подобрана» — проверьте падеж глазами.";
@@ -135,6 +139,7 @@ export const kubrayaGenerator: PuzzleGenerator = {
       title: "Кубрая",
       hits,
       note: missed.length ? `${NOTE} Не нашлось замен для: ${missed.join(", ")}.` : NOTE,
+      themeComment: KUBRAYA_RULES,
     };
   },
 };

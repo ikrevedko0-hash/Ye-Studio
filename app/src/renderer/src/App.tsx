@@ -271,7 +271,7 @@ export function App() {
    * Тема из подобранных слов: по вопросу на слово, ответ уже проставлен.
    * Цены берём из соседней темы этого же раунда — иначе новая тема не встанет в табло ровно.
    */
-  const addThemeFromWords = useCallback((title: string, hits: WordHit[]) => {
+  const addThemeFromWords = useCallback((title: string, hits: WordHit[], themeComment?: string) => {
     let used = 0;
     let dropped = 0;
     mutate((p) => {
@@ -286,6 +286,8 @@ export function App() {
       dropped = hits.length - used;
       r.themes.push({
         name: title,
+        // правила для игроков (кубрая): SIGame покажет комментарий темы, когда она пойдёт в игру
+        ...(themeComment ? { info: { comments: themeComment } } : {}),
         questions: chosen.map((h, i) => ({
           price: String(prices[i] ?? (i + 1) * 100),
           params: [{ name: "question", type: "content", children: [{ kind: "item" as const, item: { value: h.question ?? h.why } }] }],
@@ -650,7 +652,7 @@ export function App() {
       {wordStudio && (
         <WordStudio
           onClose={() => setWordStudio(false)}
-          onCreateTheme={(title, hits) => addThemeFromWords(title, hits)}
+          onCreateTheme={(title, hits, themeComment) => addThemeFromWords(title, hits, themeComment)}
           onInsert={sel ? insertWord : undefined}
           onInsertImage={sel ? insertImage : undefined}
           onImageAdded={imageAdded}
